@@ -58,4 +58,6 @@ reason - it's worth reading even after you've built the lab.
 
 Also at the repo root: `GLOSSARY.md` for any term you hit that isn't
 explained inline, `COST-LOG.md` to track real spend session by session,
-and `TROUBLESHOOTING.md` to log real errors and what fixed them.
+`TROUBLESHOOTING.md` to log real errors and what fixed them, and
+`PROGRESS.md` for the day-by-day checklist and the definition of done
+for the whole build.

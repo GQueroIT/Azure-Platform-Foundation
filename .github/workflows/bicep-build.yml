@@ -1,0 +1,35 @@
+name: Bicep Build Check
+
+on:
+  push:
+    paths:
+      - '**/*.bicep'
+  pull_request:
+    paths:
+      - '**/*.bicep'
+
+jobs:
+  build:
+    name: Lint and Build Bicep Files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Bicep CLI
+        run: |
+          az bicep install
+          az bicep version
+
+      - name: Lint every .bicep file
+        run: |
+          find . -name "*.bicep" | while read -r file; do
+            echo "Linting: $file"
+            az bicep lint --file "$file" || exit 1
+          done
+
+      - name: Build every .bicep file
+        run: |
+          find . -name "*.bicep" | while read -r file; do
+            echo "Building: $file"
+            az bicep build --file "$file" --stdout > /dev/null || exit 1
+          done
