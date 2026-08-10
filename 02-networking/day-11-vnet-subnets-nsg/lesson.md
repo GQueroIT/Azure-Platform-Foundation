@@ -1,0 +1,72 @@
+# Day 11 Lesson - VNet, Subnets, and NSGs
+
+## What You're Building Today
+A virtual network with subnets, and a network security group with custom
+rules attached to one of them.
+
+## New Bicep Concepts
+- Defining subnets inline on the VNet resource (the recommended way)
+- `securityRules` as an array of rule objects, each with a `priority`
+
+## Annotated Example
+```bicep
+resource vnet 'Microsoft.Network/virtualNetworks@2023-11-01' = {
+  name: 'vnet-lab'
+  location: resourceGroup().location
+  properties: {
+    addressSpace: {
+      addressPrefixes: [ '10.0.0.0/16' ]
+    }
+    subnets: [
+      {
+        name: 'subnet-app'
+        properties: {
+          addressPrefix: '10.0.1.0/24'
+        }
+      }
+    ]
+  }
+}
+
+resource nsg 'Microsoft.Network/networkSecurityGroups@2023-11-01' = {
+  name: 'nsg-app'
+  location: resourceGroup().location
+  properties: {
+    securityRules: [
+      {
+        name: 'AllowHTTPSInbound'
+        properties: {
+          priority: 300
+          direction: 'Inbound'
+          access: 'Allow'
+          protocol: 'Tcp'
+          sourceAddressPrefix: 'Internet'
+          sourcePortRange: '*'
+          destinationAddressPrefix: '*'
+          destinationPortRange: '443'
+        }
+      }
+    ]
+  }
+}
+```
+
+## Why It's Written This Way
+- Subnets are defined INSIDE the `properties.subnets` array on the VNet
+  resource, not as a separate top-level resource. Microsoft's own docs
+  specifically warn against defining subnets as a separate child resource
+  type - doing so can cause the subnet to briefly disappear during
+  redeployments, which can knock resources offline. Keep subnets nested.
+- `priority` on an NSG rule matters a lot - lower numbers are evaluated
+  first, and the first matching rule wins. Built-in rules always sit above
+  65000, so your custom rules (in the low hundreds/thousands) always take
+  precedence if written correctly.
+- NSG rules aren't attached to a subnet automatically just by being in the
+  same resource group - you associate an NSG with a subnet by setting the
+  subnet's `networkSecurityGroup` property to point at the NSG's `.id`
+  (not shown above for brevity, but you'll need it to actually apply
+  these rules).
+
+## Source
+<https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/scenarios-virtual-networks>
+<https://azure.github.io/PSRule.Rules.Azure/en/rules/Azure.NSG.AnyInboundSource/>

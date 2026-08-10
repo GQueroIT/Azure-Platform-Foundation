@@ -1,0 +1,13 @@
+# VS Code
+.vscode/
+
+# Secrets / local config
+*.env
+.env
+*.pem
+*.key
+*.parameters.local.json
+
+# OS junk
+.DS_Store
+Thumbs.db
