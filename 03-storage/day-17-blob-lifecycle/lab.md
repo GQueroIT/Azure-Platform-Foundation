@@ -1,7 +1,12 @@
-# Day Blob Storage and Lifecycle Management
+# Day 17 - Blob Storage and Lifecycle Management
 
 ## 1. Objective
-What this lab builds and which AZ-104 skill it maps to.
+
+### Lab Objective (Portal)
+Configure a blob lifecycle management policy through the Portal. Maps to Storage.
+
+### Bicep Objective
+Write Bicep for the same lifecycle policy as a managementPolicies child resource.
 
 ## 2. Steps Taken (Portal)
 What you clicked through in the Azure portal, in order.

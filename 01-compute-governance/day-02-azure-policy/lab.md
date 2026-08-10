@@ -1,7 +1,12 @@
-# Day Azure Policy
+# Day 02 - Azure Policy
 
 ## 1. Objective
-What this lab builds and which AZ-104 skill it maps to.
+
+### Lab Objective (Portal)
+Assign a built-in Azure Policy (tag enforcement, region restriction) through the Portal. Maps to Identities and Governance.
+
+### Bicep Objective
+Write Bicep that assigns the same policy definitions via policyAssignments, parameterized instead of hardcoded.
 
 ## 2. Steps Taken (Portal)
 What you clicked through in the Azure portal, in order.

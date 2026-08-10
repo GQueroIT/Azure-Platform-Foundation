@@ -1,7 +1,12 @@
-# Day Bicep Consolidation Pass
+# Day 09 - Bicep Consolidation Pass
 
 ## 1. Objective
-What this lab builds and which AZ-104 skill it maps to.
+
+### Lab Objective (Portal)
+No new portal work today - this is a code-quality pass over Days 00-08.
+
+### Bicep Objective
+Refactor Days 00-08's Bicep into a shared, parameterized set of files/modules and confirm a clean redeploy from scratch.
 
 ## 2. Steps Taken (Portal)
 What you clicked through in the Azure portal, in order.

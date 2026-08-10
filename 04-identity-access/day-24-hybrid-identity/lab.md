@@ -1,7 +1,12 @@
-# Day Hybrid Identity
+# Day 24 - Hybrid Identity
 
 ## 1. Objective
-What this lab builds and which AZ-104 skill it maps to.
+
+### Lab Objective (Portal)
+No hands-on portal work planned for this build - theory day on hybrid identity.
+
+### Bicep Objective
+No Bicep today - Entra Connect isn't a deployable Azure/Graph resource.
 
 ## 2. Steps Taken (Portal)
 What you clicked through in the Azure portal, in order.

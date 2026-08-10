@@ -1,7 +1,12 @@
-# Day RBAC and Management Groups
+# Day 01 - RBAC and Management Groups
 
 ## 1. Objective
-What this lab builds and which AZ-104 skill it maps to.
+
+### Lab Objective (Portal)
+Set up a management group hierarchy and assign a custom RBAC role through the Azure Portal. Maps to the Identities and Governance domain.
+
+### Bicep Objective
+Write Bicep that defines the same management group hierarchy and a custom RBAC role using roleDefinitions and roleAssignments.
 
 ## 2. Steps Taken (Portal)
 What you clicked through in the Azure portal, in order.

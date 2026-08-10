@@ -1,7 +1,12 @@
-# Day VMs and Availability Zones
+# Day 04 - VMs and Availability Zones
 
 ## 1. Objective
-What this lab builds and which AZ-104 skill it maps to.
+
+### Lab Objective (Portal)
+Deploy a B1s Linux VM pinned to an availability zone through the Portal. Maps to the Compute domain.
+
+### Bicep Objective
+Write Bicep that deploys the same VM, NIC, and zone placement from scratch.
 
 ## 2. Steps Taken (Portal)
 What you clicked through in the Azure portal, in order.

@@ -1,7 +1,12 @@
-# Day Entra ID Users and Groups
+# Day 21 - Entra ID Users and Groups
 
 ## 1. Objective
-What this lab builds and which AZ-104 skill it maps to.
+
+### Lab Objective (Portal)
+Create an Entra ID security group through the Portal or Graph PowerShell. Maps to the Identities and Governance domain.
+
+### Bicep Objective
+Write Bicep using the Microsoft Graph extension to deploy the same group and reference an existing user as owner.
 
 ## 2. Steps Taken (Portal)
 What you clicked through in the Azure portal, in order.

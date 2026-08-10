@@ -1,7 +1,12 @@
-# Day Azure Container Apps
+# Day 08 - Azure Container Apps
 
 ## 1. Objective
-What this lab builds and which AZ-104 skill it maps to.
+
+### Lab Objective (Portal)
+Deploy a container to Azure Container Apps on the consumption plan through the Portal. Maps to Compute.
+
+### Bicep Objective
+Write Bicep for the managed environment and the container app, including ingress and scale-to-zero.
 
 ## 2. Steps Taken (Portal)
 What you clicked through in the Azure portal, in order.

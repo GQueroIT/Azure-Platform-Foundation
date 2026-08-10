@@ -1,7 +1,12 @@
-# Day App Service
+# Day 07 - App Service
 
 ## 1. Objective
-What this lab builds and which AZ-104 skill it maps to.
+
+### Lab Objective (Portal)
+Deploy a Free-tier App Service web app through the Portal. Maps to Compute.
+
+### Bicep Objective
+Write Bicep for the App Service Plan and the Site resource together.
 
 ## 2. Steps Taken (Portal)
 What you clicked through in the Azure portal, in order.

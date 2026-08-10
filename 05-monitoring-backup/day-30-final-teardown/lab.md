@@ -1,7 +1,12 @@
-# Day Final Self-Test and Full Teardown
+# Day 30 - Final Self-Test and Full Teardown
 
 ## 1. Objective
-What this lab builds and which AZ-104 skill it maps to.
+
+### Lab Objective (Portal)
+Full teardown of every remaining billable resource across the whole 6-week build.
+
+### Bicep Objective
+No new code - final self-test across everything built.
 
 ## 2. Steps Taken (Portal)
 What you clicked through in the Azure portal, in order.

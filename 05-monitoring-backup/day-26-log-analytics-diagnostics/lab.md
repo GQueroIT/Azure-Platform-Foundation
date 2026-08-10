@@ -1,7 +1,12 @@
-# Day Log Analytics and Diagnostic Settings
+# Day 26 - Log Analytics and Diagnostic Settings
 
 ## 1. Objective
-What this lab builds and which AZ-104 skill it maps to.
+
+### Lab Objective (Portal)
+Deploy a Log Analytics workspace and enable a diagnostic setting through the Portal. Maps to the Monitor domain.
+
+### Bicep Objective
+Write Bicep for the workspace and a diagnostic setting scoped to an existing resource.
 
 ## 2. Steps Taken (Portal)
 What you clicked through in the Azure portal, in order.

@@ -1,7 +1,12 @@
-# Day Storage Week Review and Teardown
+# Day 20 - Storage Week Review and Teardown
 
 ## 1. Objective
-What this lab builds and which AZ-104 skill it maps to.
+
+### Lab Objective (Portal)
+No new portal work - confirm private endpoints and other billable storage resources are torn down.
+
+### Bicep Objective
+No new code - self-test yourself on Days 16-19's concepts.
 
 ## 2. Steps Taken (Portal)
 What you clicked through in the Azure portal, in order.

@@ -1,7 +1,12 @@
-# Day VNet, Subnets, and NSGs
+# Day 11 - VNet, Subnets, and NSGs
 
 ## 1. Objective
-What this lab builds and which AZ-104 skill it maps to.
+
+### Lab Objective (Portal)
+Deploy a VNet with subnets and an NSG with custom rules through the Portal. Maps to the Networking domain.
+
+### Bicep Objective
+Write Bicep for the same VNet, subnets, and NSG, with securityRules matching what you built.
 
 ## 2. Steps Taken (Portal)
 What you clicked through in the Azure portal, in order.

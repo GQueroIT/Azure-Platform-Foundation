@@ -1,7 +1,12 @@
-# Day VNet Peering and Private DNS
+# Day 12 - VNet Peering and Private DNS
 
 ## 1. Objective
-What this lab builds and which AZ-104 skill it maps to.
+
+### Lab Objective (Portal)
+Peer two VNets and deploy a private DNS zone through the Portal. Maps to Networking.
+
+### Bicep Objective
+Write Bicep that references both existing VNets and deploys peering resources on each side.
 
 ## 2. Steps Taken (Portal)
 What you clicked through in the Azure portal, in order.

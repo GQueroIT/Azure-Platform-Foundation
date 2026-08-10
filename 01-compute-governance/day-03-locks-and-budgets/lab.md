@@ -1,7 +1,12 @@
-# Day Resource Locks and Budgets
+# Day 03 - Resource Locks and Budgets
 
 ## 1. Objective
-What this lab builds and which AZ-104 skill it maps to.
+
+### Lab Objective (Portal)
+Create a resource lock and a subscription budget alert through the Portal, establishing the cost guardrails for the rest of the build. Maps to Identities and Governance.
+
+### Bicep Objective
+Write Bicep that deploys the same lock and budget via Microsoft.Authorization/locks and Microsoft.Consumption/budgets.
 
 ## 2. Steps Taken (Portal)
 What you clicked through in the Azure portal, in order.

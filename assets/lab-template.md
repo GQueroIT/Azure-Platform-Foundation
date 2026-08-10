@@ -1,7 +1,12 @@
 # Day <NN> - <Topic>
 
 ## 1. Objective
+
+### Lab Objective (Portal)
 What this lab builds and which AZ-104 skill it maps to.
+
+### Bicep Objective
+What you're separately writing in Bicep to reproduce it.
 
 ## 2. Steps Taken (Portal)
 What you clicked through in the Azure portal, in order.

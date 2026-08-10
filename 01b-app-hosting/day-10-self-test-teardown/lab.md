@@ -1,7 +1,12 @@
-# Day Self-Test and Teardown
+# Day 10 - Self-Test and Teardown
 
 ## 1. Objective
-What this lab builds and which AZ-104 skill it maps to.
+
+### Lab Objective (Portal)
+No new portal work - confirm every resource from Weeks 1-2 is actually deallocated or deleted.
+
+### Bicep Objective
+No new code - self-test yourself on Days 00-09's concepts without looking back at the lessons.
 
 ## 2. Steps Taken (Portal)
 What you clicked through in the Azure portal, in order.

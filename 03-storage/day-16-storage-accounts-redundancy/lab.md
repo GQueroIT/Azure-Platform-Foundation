@@ -1,7 +1,12 @@
-# Day Storage Accounts and Redundancy
+# Day 16 - Storage Accounts and Redundancy
 
 ## 1. Objective
-What this lab builds and which AZ-104 skill it maps to.
+
+### Lab Objective (Portal)
+Deploy a storage account and test redundancy tier configurations through the Portal. Maps to the Storage domain.
+
+### Bicep Objective
+Write Bicep for the storage account, parameterizing the SKU so you can redeploy at different redundancy tiers.
 
 ## 2. Steps Taken (Portal)
 What you clicked through in the Azure portal, in order.

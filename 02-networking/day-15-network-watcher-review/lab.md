@@ -1,7 +1,12 @@
-# Day Network Watcher and Week Review
+# Day 15 - Network Watcher and Week Review
 
 ## 1. Objective
-What this lab builds and which AZ-104 skill it maps to.
+
+### Lab Objective (Portal)
+Explore Network Watcher's diagnostic tools through the Portal. Review Week 3 (Days 11-14) before moving to Storage.
+
+### Bicep Objective
+Write a Bicep reference to the existing Network Watcher resource in NetworkWatcherRG.
 
 ## 2. Steps Taken (Portal)
 What you clicked through in the Azure portal, in order.

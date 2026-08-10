@@ -1,7 +1,12 @@
-# Day Azure Files
+# Day 18 - Azure Files
 
 ## 1. Objective
-What this lab builds and which AZ-104 skill it maps to.
+
+### Lab Objective (Portal)
+Deploy an Azure Files share through the Portal. Maps to Storage.
+
+### Bicep Objective
+Write Bicep for the fileServices and shares child resources.
 
 ## 2. Steps Taken (Portal)
 What you clicked through in the Azure portal, in order.

@@ -1,7 +1,12 @@
-# Day RBAC vs Entra Roles
+# Day 22 - RBAC vs Entra Roles
 
 ## 1. Objective
-What this lab builds and which AZ-104 skill it maps to.
+
+### Lab Objective (Portal)
+Assign a test account an Entra directory role through the Portal, alongside an Azure RBAC role. Maps to Identities and Governance.
+
+### Bicep Objective
+Write Bicep for both a Microsoft.Authorization roleAssignment and a Microsoft.Graph directoryRoleAssignment, side by side.
 
 ## 2. Steps Taken (Portal)
 What you clicked through in the Azure portal, in order.

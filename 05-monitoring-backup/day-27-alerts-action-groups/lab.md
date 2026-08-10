@@ -1,7 +1,12 @@
-# Day Alert Rules and Action Groups
+# Day 27 - Alert Rules and Action Groups
 
 ## 1. Objective
-What this lab builds and which AZ-104 skill it maps to.
+
+### Lab Objective (Portal)
+Create an action group and a metric alert rule through the Portal. Maps to Monitor.
+
+### Bicep Objective
+Write Bicep for both resources, with the alert referencing the action group by ID.
 
 ## 2. Steps Taken (Portal)
 What you clicked through in the Azure portal, in order.

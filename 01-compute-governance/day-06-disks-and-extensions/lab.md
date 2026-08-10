@@ -1,7 +1,12 @@
-# Day Managed Disks and VM Extensions
+# Day 06 - Managed Disks and VM Extensions
 
 ## 1. Objective
-What this lab builds and which AZ-104 skill it maps to.
+
+### Lab Objective (Portal)
+Attach a managed data disk and run a VM extension on the Day 04 VM through the Portal. Maps to Compute.
+
+### Bicep Objective
+Write Bicep that attaches the same data disk and deploys the same extension as a child resource.
 
 ## 2. Steps Taken (Portal)
 What you clicked through in the Azure portal, in order.

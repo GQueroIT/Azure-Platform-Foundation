@@ -1,7 +1,12 @@
-# Day Conditional Access and SSPR
+# Day 23 - Conditional Access and SSPR
 
 ## 1. Objective
-What this lab builds and which AZ-104 skill it maps to.
+
+### Lab Objective (Portal)
+Configure Conditional Access and SSPR through the Portal - these aren't Bicep-deployable. Maps to Identities and Governance.
+
+### Bicep Objective
+No Bicep today - document why, and cross-reference identity-security-entra instead.
 
 ## 2. Steps Taken (Portal)
 What you clicked through in the Azure portal, in order.

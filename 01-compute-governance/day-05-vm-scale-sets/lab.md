@@ -1,7 +1,12 @@
-# Day VM Scale Sets
+# Day 05 - VM Scale Sets
 
 ## 1. Objective
-What this lab builds and which AZ-104 skill it maps to.
+
+### Lab Objective (Portal)
+Deploy a small VM Scale Set spread across availability zones through the Portal. Maps to Compute.
+
+### Bicep Objective
+Write Bicep that deploys the same VMSS, with sku.capacity and zones set correctly.
 
 ## 2. Steps Taken (Portal)
 What you clicked through in the Azure portal, in order.

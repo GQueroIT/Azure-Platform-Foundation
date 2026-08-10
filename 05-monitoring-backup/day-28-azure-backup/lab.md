@@ -1,7 +1,12 @@
-# Day Azure Backup
+# Day 28 - Azure Backup
 
 ## 1. Objective
-What this lab builds and which AZ-104 skill it maps to.
+
+### Lab Objective (Portal)
+Create a Recovery Services vault and backup policy, and back up the Day 04 VM, through the Portal. Maps to Monitor (backup).
+
+### Bicep Objective
+Write Bicep for the vault, policy, and protected item - including that awkward protected-item name format.
 
 ## 2. Steps Taken (Portal)
 What you clicked through in the Azure portal, in order.

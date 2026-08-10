@@ -1,7 +1,12 @@
-# Day Azure Bastion and VPN Gateway
+# Day 14 - Azure Bastion and VPN Gateway
 
 ## 1. Objective
-What this lab builds and which AZ-104 skill it maps to.
+
+### Lab Objective (Portal)
+Deploy Azure Bastion and a basic VPN Gateway through the Portal - the most expensive lab in the build, delete both the same day. Maps to Networking.
+
+### Bicep Objective
+Write Bicep for both gateway resources, including the required AzureBastionSubnet/GatewaySubnet naming.
 
 ## 2. Steps Taken (Portal)
 What you clicked through in the Azure portal, in order.

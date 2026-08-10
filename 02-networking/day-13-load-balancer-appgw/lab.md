@@ -1,7 +1,12 @@
-# Day Load Balancer and Application Gateway
+# Day 13 - Load Balancer and Application Gateway
 
 ## 1. Objective
-What this lab builds and which AZ-104 skill it maps to.
+
+### Lab Objective (Portal)
+Deploy a Standard Load Balancer in front of two backend addresses through the Portal. Maps to Networking.
+
+### Bicep Objective
+Write Bicep for the load balancer, frontend, backend pool, probe, and rule - delete the resource the same day.
 
 ## 2. Steps Taken (Portal)
 What you clicked through in the Azure portal, in order.

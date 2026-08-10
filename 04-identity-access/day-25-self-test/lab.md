@@ -1,7 +1,12 @@
-# Day Identity Week Self-Test
+# Day 25 - Identity Week Self-Test
 
 ## 1. Objective
-What this lab builds and which AZ-104 skill it maps to.
+
+### Lab Objective (Portal)
+No new portal work - self-test on Days 21-24.
+
+### Bicep Objective
+No new code - self-test yourself on Days 21-24's concepts.
 
 ## 2. Steps Taken (Portal)
 What you clicked through in the Azure portal, in order.

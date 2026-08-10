@@ -1,7 +1,12 @@
-# Day SAS Tokens and Private Endpoints
+# Day 19 - SAS Tokens and Private Endpoints
 
 ## 1. Objective
-What this lab builds and which AZ-104 skill it maps to.
+
+### Lab Objective (Portal)
+Generate a SAS token via Azure CLI and deploy a private endpoint for the storage account through the Portal. Maps to Storage.
+
+### Bicep Objective
+Write Bicep for the private endpoint only - SAS tokens aren't a deployable resource.
 
 ## 2. Steps Taken (Portal)
 What you clicked through in the Azure portal, in order.
