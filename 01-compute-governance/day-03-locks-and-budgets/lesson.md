@@ -58,3 +58,6 @@ resource monthlyBudget 'Microsoft.Consumption/budgets@2023-11-01' = {
 ## Source
 <https://learn.microsoft.com/en-us/azure/cost-management-billing/costs/quick-create-budget-bicep>
 <https://learn.microsoft.com/en-us/azure/templates/microsoft.consumption/budgets>
+
+## Why This Matters (Business Context)
+A junior engineer runs a cleanup script against the wrong resource group and deletes a production database at 2am. A lock doesn't prevent honest mistakes from happening, it prevents them from being one click away. Budgets solve the more common failure: nobody notices a forgotten test environment running until the bill arrives, sometimes 10x over what anyone expected.

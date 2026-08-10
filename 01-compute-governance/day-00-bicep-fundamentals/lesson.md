@@ -100,3 +100,6 @@ between resources explicit.
 <https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/file>
 <https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/parameters>
 <https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/variables>
+
+## Why This Matters (Business Context)
+Every cloud team eventually hits the same wall: someone changes a setting by hand in the portal, nobody documents it, and six months later no one can reproduce the environment or explain why it works. Infrastructure as code closes that gap - the Bicep file itself becomes the documentation, the audit trail, and the disaster-recovery plan all at once. A company that can redeploy its entire environment from a git repo during an outage recovers in hours; a company that can't is rebuilding from memory and screenshots.

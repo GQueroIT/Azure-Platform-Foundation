@@ -52,3 +52,6 @@ output arcMachineStatus string = arcMachine.properties.status
 General Azure Arc onboarding process (azcmagent) - no single Bicep
 reference applies to the onboarding step itself, since it isn't a Bicep
 operation.
+
+## Why This Matters (Business Context)
+A company has a mix of cloud VMs and physical servers still sitting in a closet somewhere, and the on-prem boxes never get the same patching, monitoring, or policy the cloud VMs get, because they're invisible to the same tools. Arc is how a company brings those boxes into the same management plane instead of treating them as a permanent blind spot.

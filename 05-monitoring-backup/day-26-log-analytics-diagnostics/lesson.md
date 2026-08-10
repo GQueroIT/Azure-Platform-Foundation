@@ -60,3 +60,6 @@ resource diagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview'
 ## Source
 <https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/scenarios-monitoring>
 <https://rikhepworth.com/post/2024/05/2024-05-17-configuring-diagnostic-settings-for-azure-services-using-bicep/>
+
+## Why This Matters (Business Context)
+A production app goes down at 3am and there's no logging turned on, so troubleshooting starts from zero. Diagnostic settings piping into Log Analytics turn 'we have no idea what happened' into 'here's the exact error and the exact minute it started.'

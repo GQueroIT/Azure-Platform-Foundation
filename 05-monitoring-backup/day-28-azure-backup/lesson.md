@@ -71,3 +71,6 @@ resource protectedVm 'Microsoft.RecoveryServices/vaults/backupFabrics/protection
 ## Source
 <https://learn.microsoft.com/en-us/azure/templates/microsoft.recoveryservices/vaults/backuppolicies>
 <https://learn.microsoft.com/en-us/azure/site-recovery/quickstart-create-vault-bicep>
+
+## Why This Matters (Business Context)
+A ransomware attack encrypts a company's production database, and their only backup is a manual export someone meant to automate eighteen months ago. Azure Backup with a real retention policy is what makes 'restore from last night' an actual option instead of a hope.

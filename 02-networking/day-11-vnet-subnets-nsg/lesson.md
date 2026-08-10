@@ -70,3 +70,6 @@ resource nsg 'Microsoft.Network/networkSecurityGroups@2023-11-01' = {
 ## Source
 <https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/scenarios-virtual-networks>
 <https://azure.github.io/PSRule.Rules.Azure/en/rules/Azure.NSG.AnyInboundSource/>
+
+## Why This Matters (Business Context)
+A company puts its database on the same open subnet as its public-facing web server. One vulnerability in the web app and the database is directly reachable. Subnets and NSGs are what stop a compromised front-end from automatically meaning a compromised back-end.

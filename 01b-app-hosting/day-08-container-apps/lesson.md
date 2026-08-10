@@ -65,3 +65,6 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
 
 ## Source
 <https://learn.microsoft.com/en-us/azure/templates/microsoft.app/containerapps>
+
+## Why This Matters (Business Context)
+A startup's API gets almost no traffic overnight and spikes hard during business hours. Paying for a server that sits idle sixteen hours a day is real money at scale. Scaling to zero means the meter stops when nobody's using it - you pay for requests, not for a machine sitting there waiting.

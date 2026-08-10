@@ -33,3 +33,6 @@ Go back through Days 11-14 and confirm:
 - [ ] Bastion and VPN Gateway from Day 14 are DELETED, not just tested
 - [ ] Your Bicep files for this phase deploy cleanly from scratch if you
       delete the resource group and redeploy
+
+## Why This Matters (Business Context)
+A firewall rule change breaks connectivity between two services and nobody can tell if it's DNS, routing, or the NSG without hours of guessing. Network Watcher's diagnostic tools turn 'we think it's the network' into an actual answer in minutes.

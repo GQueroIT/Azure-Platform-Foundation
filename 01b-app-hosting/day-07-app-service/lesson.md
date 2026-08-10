@@ -50,3 +50,6 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
 
 ## Source
 <https://github.com/MicrosoftDocs/azure-docs/blob/main/articles/app-service/samples-bicep.md>
+
+## Why This Matters (Business Context)
+A small business wants a customer-facing website live without hiring anyone to patch an OS, manage a web server, or handle certificate renewal. App Service is exactly that trade-off - less control than a VM, but someone else owns the patching, scaling, and certificate headaches.

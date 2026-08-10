@@ -50,3 +50,6 @@ resource privateEndpoint 'Microsoft.Network/privateEndpoints@2023-11-01' = {
 
 ## Source
 Private endpoint pattern from <https://shakeeljuancalleghani.medium.com/mastering-azure-bicep-deploy-storage-account-containers-lifecycle-management-policies-and-56d130aae48b>
+
+## Why This Matters (Business Context)
+A vendor needs temporary access to one specific file, not the whole storage account and not forever. A SAS token grants exactly that - scoped, time-limited access, no shared password to rotate later. A private endpoint solves a different problem: a database that should never be reachable from the public internet at all, only from inside the company's own network.

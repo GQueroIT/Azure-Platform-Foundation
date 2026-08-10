@@ -65,3 +65,6 @@ resource lifecyclePolicy 'Microsoft.Storage/storageAccounts/managementPolicies@2
 
 ## Source
 <https://learn.microsoft.com/en-us/azure/storage/blobs/lifecycle-management-policy-configure>
+
+## Why This Matters (Business Context)
+A company keeps every log file it's ever generated on the same expensive storage tier it uses for active data, because nobody set up a policy to move it. Lifecycle management is the unglamorous rule that quietly saves real money every month without anyone having to remember to run a cleanup script.

@@ -77,3 +77,6 @@ resource cpuAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = {
 
 ## Source
 <https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/resource-manager-action-groups>
+
+## Why This Matters (Business Context)
+A disk fills up on a Friday afternoon and nobody notices until Monday morning, when the app has been down all weekend. An alert rule wired to an action group is the difference between someone getting paged Friday at 3pm versus finding out from an angry customer on Monday.

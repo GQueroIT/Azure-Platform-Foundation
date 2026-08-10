@@ -39,3 +39,6 @@ resource fileShare 'Microsoft.Storage/storageAccounts/fileServices/shares@2023-0
 ## Source
 Structure based on Microsoft.Storage nested resource conventions - see
 <https://learn.microsoft.com/en-us/azure/templates/microsoft.storage/storageaccounts/fileservices/shares>
+
+## Why This Matters (Business Context)
+A team needs a shared drive that multiple VMs and people can read and write to at once, the way a traditional file server would work, without standing up and patching an actual Windows file server. Azure Files is that shared drive, managed by the platform instead of by someone's on-call rotation.

@@ -88,3 +88,6 @@ resource vm 'Microsoft.Compute/virtualMachines@2024-07-01' = {
 ## Source
 <https://learn.microsoft.com/en-us/azure/templates/microsoft.compute/virtualmachines>
 <https://azure.github.io/PSRule.Rules.Azure/en/rules/Azure.VMSS.AvailabilityZone/>
+
+## Why This Matters (Business Context)
+An e-commerce company's checkout service runs on a single VM in a single datacenter. That datacenter has a power event during a big sale, and every transaction is gone until it comes back. Availability zones are the difference between 'one datacenter went down' and 'nothing happened, the other two zones picked up the load.'

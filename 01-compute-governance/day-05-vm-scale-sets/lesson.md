@@ -78,3 +78,6 @@ resource vmss 'Microsoft.Compute/virtualMachineScaleSets@2024-07-01' = {
 
 ## Source
 <https://azure.github.io/PSRule.Rules.Azure/en/rules/Azure.VMSS.AvailabilityZone/>
+
+## Why This Matters (Business Context)
+Traffic to a retail site is flat most of the year and 20x normal during a holiday sale. Provisioning for peak year-round wastes money every other week; provisioning for average traffic means the site falls over during the sale. A scale set is how you pay for average and still survive peak.

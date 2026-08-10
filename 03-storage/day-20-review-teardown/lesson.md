@@ -14,3 +14,6 @@ No new syntax today.
 - [ ] Any test containers/shares with real cost impact cleaned up
 - [ ] Bicep files for this phase deploy cleanly from a fresh resource group
 - [ ] Lab docs and lessons committed
+
+## Why This Matters (Business Context)
+Same lesson as Day 10 - a private endpoint or test container left running past its testing window is easy to forget and easy to get billed for. Reviewing and tearing down is part of the actual job, not an afterthought.

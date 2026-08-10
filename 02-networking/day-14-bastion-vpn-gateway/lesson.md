@@ -93,3 +93,6 @@ resource vpnGateway 'Microsoft.Network/virtualNetworkGateways@2023-11-01' = {
 ## Source
 <https://github.com/Azure/azure-quickstart-templates/blob/master/quickstarts/microsoft.network/azure-bastion/main.bicep>
 <https://learn.microsoft.com/en-us/azure/templates/microsoft.network/virtualnetworkgateways>
+
+## Why This Matters (Business Context)
+A company opens RDP directly to the internet on a VM 'just for now' to make admin easier, and it gets brute-forced within days. Bastion exists so there's never a public RDP/SSH port to attack in the first place. VPN Gateway is the same idea for connecting an entire office network to Azure without exposing anything to the open internet.

@@ -13,3 +13,6 @@ No new syntax today.
 
 If any of these are shaky, that's this week's material to revisit before
 moving to Monitoring & Backup.
+
+## Why This Matters (Business Context)
+The exam doesn't ask you to build something with the lesson open next to you. Neither does an interview. This is the day that tests whether the knowledge actually stuck, or whether you were just following steps.

@@ -52,3 +52,6 @@ completely different systems underneath.
 
 ## Source
 <https://learn.microsoft.com/en-us/graph/templates/overview-bicep-templates-for-graph>
+
+## Why This Matters (Business Context)
+A well-meaning admin grants someone Global Administrator in Entra ID to fix an Azure resource permission problem, not realizing the two systems are unrelated. That's a massively over-scoped grant for a problem RBAC alone would have solved. Knowing the actual boundary between the two systems is what prevents that kind of accidental over-permissioning.

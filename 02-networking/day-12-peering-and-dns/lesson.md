@@ -66,3 +66,6 @@ resource peeringBtoA 'Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2
 
 ## Source
 <https://learn.microsoft.com/en-us/azure/templates/microsoft.network/virtualnetworks/virtualnetworkpeerings>
+
+## Why This Matters (Business Context)
+Two teams each built their own VNet for their own project, and now a shared service needs to talk to both without routing traffic over the public internet. Peering keeps that traffic on Microsoft's backbone instead of exposing it externally; private DNS means internal services find each other by name instead of hardcoded IPs that break the moment something gets redeployed.

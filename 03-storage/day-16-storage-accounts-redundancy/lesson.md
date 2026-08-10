@@ -43,3 +43,6 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2025-06-01' = {
 
 ## Source
 <https://learn.microsoft.com/en-us/azure/templates/microsoft.storage/storageaccounts>
+
+## Why This Matters (Business Context)
+A regional outage takes out a datacenter, and a company running LRS-only storage loses access to its data until that datacenter recovers. GRS costs more for a reason - it's the difference between a bad afternoon and a real disaster, and part of the job is knowing which workloads are worth paying for that on.

@@ -51,3 +51,6 @@ findable in the Azure Policy portal under Definitions.
 
 ## Source
 <https://learn.microsoft.com/en-us/azure/governance/policy/assign-policy-bicep>
+
+## Why This Matters (Business Context)
+A developer spins up a storage account in a region the company isn't allowed to operate in for compliance reasons, and nobody notices until an audit six months later. Policy is how a company enforces rules automatically instead of hoping people remember them - tag enforcement is what lets finance actually bill costs back to the right department, and region restriction is what lets legal stop manually reviewing every deployment.

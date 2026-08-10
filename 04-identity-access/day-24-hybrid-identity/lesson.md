@@ -29,3 +29,6 @@ worth flagging for later.
 ## Source
 General Entra Connect architecture concepts - no Bicep-specific source
 applies here since this isn't a Bicep-deployable resource.
+
+## Why This Matters (Business Context)
+A company has fifteen years of on-prem Active Directory - decades of accumulated group policy, file shares, and legacy apps that will never move to the cloud - but also wants Microsoft 365 and Azure. Hybrid identity is how that company gets one identity that works everywhere, instead of maintaining two separate, drifting sets of user accounts forever.

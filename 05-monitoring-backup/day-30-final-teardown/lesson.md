@@ -21,3 +21,6 @@ No new syntax today. This closes out the 6-week build.
 ## Next
 Weeks 7-8 of the Master Blueprint: Microsoft Learn practice assessment,
 targeted review of weak domains, then book the exam.
+
+## Why This Matters (Business Context)
+Same discipline as Day 10 and Day 20, at the scale of the entire six-week build. A real engineer doesn't just build things, they also know exactly what's running and why, and can prove nothing billable is left orphaned when a project wraps.

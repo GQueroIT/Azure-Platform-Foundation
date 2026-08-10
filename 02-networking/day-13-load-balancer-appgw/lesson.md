@@ -86,3 +86,6 @@ resource lb 'Microsoft.Network/loadBalancers@2023-11-01' = {
 Structure based on `Microsoft.Network/loadBalancers` general resource
 patterns - see <https://learn.microsoft.com/en-us/azure/templates/microsoft.network/loadbalancers>
 for the full property reference.
+
+## Why This Matters (Business Context)
+A company's app runs fine on one server until that server needs a restart for a patch, and the site goes down during the restart. A load balancer means traffic just shifts to the healthy instances during a rolling update, and customers never notice.

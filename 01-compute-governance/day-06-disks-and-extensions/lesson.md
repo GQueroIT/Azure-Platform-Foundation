@@ -62,3 +62,6 @@ resource vmExtension 'Microsoft.Compute/virtualMachines/extensions@2024-07-01' =
 
 ## Source
 <https://learn.microsoft.com/en-us/azure/templates/microsoft.compute/virtualmachines>
+
+## Why This Matters (Business Context)
+A company's monitoring agent needs to be installed identically across 200 VMs today, and on every VM anyone spins up next year. Doing that by hand means it eventually drifts - some VMs get it, some don't, and nobody notices until there's an incident with no logs. An extension baked into the deployment means every VM has it, guaranteed, the moment it exists.

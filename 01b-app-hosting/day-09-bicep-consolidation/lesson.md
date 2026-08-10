@@ -21,3 +21,6 @@ questions about Bicep test whether you understand modules, parameters, and
 reusability, not just whether you can write one resource block. A pile of
 9 unrelated .bicep files is very different from a small set of
 well-parameterized ones that call each other.
+
+## Why This Matters (Business Context)
+A contractor hands off a project as nine unrelated scripts, no shared naming convention, hardcoded values specific to their test environment. The next engineer spends a week just figuring out how to redeploy it somewhere else. Modular, parameterized Bicep is what makes a handoff take an hour instead of a week.

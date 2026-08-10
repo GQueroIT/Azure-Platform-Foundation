@@ -79,3 +79,6 @@ which you can browse per-service in the Azure docs.
 ## Source
 <https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/scenarios-rbac>
 <https://learn.microsoft.com/en-us/azure/role-based-access-control/quickstart-role-assignments-bicep>
+
+## Why This Matters (Business Context)
+A new hire in finance needs read-only access to cost data, not the ability to delete production VMs. Without RBAC scoped correctly, companies either lock everything down so tight nobody can do their job, or leave everything open so one mistake (or one compromised account) can take down the whole environment. Management groups exist because a 200-subscription company can't apply policy one subscription at a time - they say 'everything under Finance follows this rule' once, and it inherits down automatically.

@@ -57,3 +57,6 @@ resource securityGroup 'Microsoft.Graph/groups@v1.0' = {
 ## Source
 <https://devblogs.microsoft.com/identity/bicep-templates-for-microsoft-entra-id-resources-is-ga/>
 <https://learn.microsoft.com/en-us/graph/templates/overview-bicep-templates-for-graph>
+
+## Why This Matters (Business Context)
+A company onboards dozens of new hires a quarter and manually adds each one to the right groups by hand, in the portal. Every mistake in that process is either someone with access they shouldn't have, or someone missing access they need on day one. Automating group membership is how that scales past a handful of people.
