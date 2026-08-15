@@ -1,5 +1,36 @@
 # Day 08 Lesson - Azure Container Apps
 
+## Core Concepts (Read This First)
+
+### Where Container Apps Sits
+Three ways to run a container in Azure, in order of how much you manage
+yourself: **App Service** (Linux container support, simplest, closest to
+"just run this container as a web app"), **Container Apps** (this
+lesson - real container orchestration primitives like revisions and
+traffic-splitting, without you managing a Kubernetes cluster), and
+**AKS / Azure Kubernetes Service** (full Kubernetes, maximum control and
+complexity, you own far more of the operational surface). Container Apps
+is deliberately the middle option - Kubernetes-like capabilities, PaaS
+levels of operational effort.
+
+### Revisions
+Every time you update a Container App's configuration, Azure creates a
+new **revision** rather than overwriting the running one in place. By
+default only the newest revision serves traffic, but you can run multiple
+revisions simultaneously and split traffic between them by percentage -
+this is how blue-green deployments or gradual rollouts work on Container
+Apps, and it's not something this lesson's basic example shows, but it's
+the reason Container Apps exists as a distinct product rather than "App
+Service that happens to run containers."
+
+### Consumption vs Dedicated
+This lesson's example runs on the **Consumption** plan - pay per second
+of actual usage, and the `minReplicas: 0` scale-to-zero behavior only
+works here. A **Dedicated** workload profile exists for workloads that
+need predictable, reserved capacity instead of consumption-based billing
+- worth knowing the option exists even though this build stays on
+Consumption to keep costs at zero when idle.
+
 ## What You're Building Today
 A container deployed to Container Apps on the consumption plan.
 

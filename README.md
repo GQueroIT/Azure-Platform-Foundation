@@ -61,3 +61,14 @@ explained inline, `COST-LOG.md` to track real spend session by session,
 `TROUBLESHOOTING.md` to log real errors and what fixed them, and
 `PROGRESS.md` for the day-by-day checklist and the definition of done
 for the whole build.
+
+## Terraform Migration Track (06-terraform-migration)
+
+A second pass through the compute-governance objectives, rebuilt in
+Terraform instead of Bicep. Same Azure concepts, different tool -- the
+point is proving the underlying understanding transfers, not re-learning
+RBAC or Azure Policy from zero.
+
+**Sequencing rule:** don't start a Terraform day until the matching Bicep
+day above is fully checked off. See `06-terraform-migration/README.md`
+for the day-by-day breakdown and the reasoning behind the rule.

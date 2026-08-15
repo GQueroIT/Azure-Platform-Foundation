@@ -1,5 +1,26 @@
 # Day 14 Lesson - Azure Bastion and VPN Gateway
 
+## Core Concepts (Read This First)
+
+### VPN Gateway Connection Types
+The gateway resource in this lesson is the shared foundation both
+connection types are built on - the actual "type" comes from the
+connection resource layered on top of it, not the gateway itself.
+**Site-to-Site** connects an entire on-prem network to a VNet, with a VPN
+device on each end maintaining a persistent tunnel - this is how a whole
+office gets access to Azure resources. **Point-to-Site** connects
+individual devices (a single laptop, no VPN hardware needed on that end)
+directly into the VNet - this is how one remote person gets in without
+the company needing a site-to-site tunnel just for them.
+
+### Bastion SKU Tiers
+Bastion has Basic and Standard tiers. Basic (used in this lesson) covers
+straightforward RDP/SSH access through the portal, which is all a lab
+needs. Standard adds native client support (connecting via your own
+RDP/SSH client instead of only the browser), IP-based connection, and the
+ability to scale the host for more concurrent sessions - relevant at
+organization scale, not for this build.
+
 Cost note: this is the single most expensive day in the whole build. Both
 of these resources bill hourly with no "stop" option like a VM has - test,
 document, then delete both before you close the laptop.

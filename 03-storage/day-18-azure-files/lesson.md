@@ -1,5 +1,19 @@
 # Day 18 Lesson - Azure Files
 
+## Core Concepts (Read This First)
+
+### Azure Files vs Blob Storage
+Both live under the same storage account, and it's easy to assume they're
+interchangeable - they're not. **Blob storage** is object storage:
+everything is addressed by a flat name/key, accessed over HTTP/HTTPS, and
+has no real concept of "mounting a drive." **Azure Files** is a genuine
+network file share over SMB (or NFS) - the protocol Windows/Linux already
+use for shared drives - so an existing application expecting a drive
+letter or a mounted path can often point at an Azure Files share with
+little to no code change. That's the whole reason Azure Files exists
+separately from Blob: lift-and-shift compatibility with things that
+already expect a traditional file share.
+
 ## What You're Building Today
 A file share inside your storage account.
 

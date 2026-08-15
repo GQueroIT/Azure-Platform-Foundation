@@ -1,5 +1,42 @@
 # Day 05 Lesson - VM Scale Sets
 
+## Core Concepts (Read This First)
+
+### Orchestration Mode: The Decision You Can't Undo Later
+Every VM Scale Set is built in one of two orchestration modes, and Azure
+won't let you change it after the scale set is created - picking wrong
+means recreating the whole thing. **Uniform** mode is the older approach:
+every instance is identical, managed through the scale set's own API
+rather than normal VM APIs, and individual instances can't use things
+like Azure Backup or standard RBAC tagging the way a regular VM can.
+**Flexible** mode is Microsoft's current recommendation for basically all
+new scale sets - each instance behaves like a real, standalone VM under
+the hood (so it works with the normal VM APIs, Backup, tagging,
+everything), while still giving you scale-set-level autoscaling and
+zone-spreading. If you don't explicitly set `orchestrationMode`, it
+defaults to Uniform - worth setting on purpose:
+
+```bicep
+properties: {
+  orchestrationMode: 'Flexible'
+  // ...
+}
+```
+
+Exam material and a lot of existing documentation (including patterns
+you'll see online) still lean on Uniform because it's older and
+better-documented - but for anything you'd actually build today, Flexible
+is the right default.
+
+### Autoscale Isn't Automatic Just Because You Have a VMSS
+Deploying a scale set with `capacity: 3` gives you exactly 3 instances,
+permanently, until you manually change that number - it does not scale on
+its own. Actual autoscaling requires a separate
+`Microsoft.Insights/autoscaleSettings` resource defining rules (e.g. "add
+an instance when average CPU > 70% for 5 minutes"), which isn't in this
+lesson's example. Worth knowing going in so you don't expect scale-out
+behavior that the base VMSS resource alone doesn't provide.
+
 ## What You're Building Today
 A small VM Scale Set (VMSS) spread across availability zones.
 

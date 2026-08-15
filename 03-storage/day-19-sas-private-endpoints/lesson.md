@@ -1,5 +1,32 @@
 # Day 19 Lesson - SAS Tokens and Private Endpoints
 
+## Core Concepts (Read This First)
+
+### Service Endpoint vs Private Endpoint
+This lesson builds a private endpoint, but the exam expects you to know
+there's a second, older option: a **service endpoint**. A service
+endpoint extends your VNet's identity to the storage account - traffic
+stays on the Azure backbone instead of the public internet, but it still
+travels to the storage account's *public* IP, and no private IP is
+created anywhere. A **private endpoint** goes further: it creates an
+actual private IP address inside your VNet that represents the storage
+account, so traffic never touches a public IP at all, and it's specific
+to one resource (even one sub-resource, via `groupIds`) rather than an
+entire service type. Service endpoints are simpler and free; private
+endpoints are more isolated and cost a small hourly charge - Microsoft's
+current guidance leans toward private endpoints where the added isolation
+is worth that cost.
+
+### SAS Token Types
+Not all SAS tokens are the same scope. An **Account SAS** grants access
+across multiple storage services within the account (blob, file, queue,
+table) at once. A **Service SAS** scopes down to one specific service
+(e.g. just blob). A **User Delegation SAS** is the most secure option -
+it's secured with Entra ID credentials instead of the storage account's
+own access keys, so it can be revoked by revoking Entra permissions
+without having to rotate the account's keys (which would break every
+other SAS token issued from those keys at the same time).
+
 Cost note: private endpoints bill a small hourly charge - delete after
 testing, same day.
 

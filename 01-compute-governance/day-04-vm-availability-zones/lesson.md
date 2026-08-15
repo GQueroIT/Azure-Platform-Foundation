@@ -1,5 +1,32 @@
 # Day 04 Lesson - VMs and Availability Zones
 
+## Core Concepts (Read This First)
+
+### Availability Zone vs Availability Set
+These sound similar and get confused constantly, including on the exam.
+An **Availability Set** is a logical grouping within a single Azure
+datacenter - it spreads your VMs across separate physical racks (update
+domains and fault domains) so a single hardware failure or planned
+maintenance doesn't take out every VM at once. It protects you from
+failures inside one datacenter. An **Availability Zone** is much bigger
+blast-radius protection: each zone is a physically separate datacenter
+within the region, with its own independent power, cooling, and
+networking. Pinning VMs across multiple zones protects you even if an
+entire datacenter goes down.
+
+### SLA Differences
+A genuine exam-relevant number worth knowing: a single VM using Premium
+SSD gets a 99.9% SLA. VMs in an Availability Set get 99.95%. VMs spread
+across Availability Zones get 99.99%. Each jump is a real, meaningfully
+different amount of allowed downtime per year - 99.9% allows roughly 8.7
+hours of downtime a year; 99.99% allows roughly 52 minutes.
+
+### Not Every Region Supports Zones
+Availability Zones require the region to physically have multiple
+independent datacenters - not every Azure region does. Before you plan a
+zone-based design, check that the target region actually supports zones
+rather than assuming it does.
+
 ## What You're Building Today
 Your first VM in Bicep, pinned to a specific availability zone.
 

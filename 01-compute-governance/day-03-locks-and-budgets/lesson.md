@@ -1,5 +1,29 @@
 # Day 03 Lesson - Resource Locks and Budgets
 
+## Core Concepts (Read This First)
+
+### Locks Override RBAC - On Purpose
+This is the detail that trips people up: a resource lock isn't a
+permission, it's a hard stop that applies regardless of what RBAC role
+someone holds. Even the Subscription Owner can't delete a
+`CanNotDelete`-locked resource without first removing the lock. That's
+the entire point - a lock protects against the exact scenario where
+someone technically has full permission and still shouldn't act, like the
+2am production-database scenario below. Locks inherit downward too: a
+lock on a resource group applies to everything inside it, even resources
+that don't have their own lock.
+
+### Budgets Don't Stop Spending
+A common assumption worth correcting early: an Azure budget is not a
+spending cap. Nothing about a `Microsoft.Consumption/budgets` resource
+stops a VM from running or blocks a deployment once you cross the
+threshold - it only fires a notification. If you actually want spend to
+trigger an automated response (like shutting something down), that
+requires wiring the budget's alert to an Action Group and further
+automation yourself; it doesn't happen by default. Treat the budget in
+this lesson as a smoke alarm, not a circuit breaker - it tells you
+something's on fire, it doesn't put the fire out.
+
 ## What You're Building Today
 A resource lock and a subscription budget alert, in Bicep. This is also
 your cost-control safety net for the rest of the build.

@@ -1,5 +1,29 @@
 # Day 13 Lesson - Load Balancer and Application Gateway
 
+## Core Concepts (Read This First)
+
+### Load Balancer vs Application Gateway - The Actual Difference
+This day's title mentions both, but the example only builds a Load
+Balancer - worth understanding both before moving on, since mixing them
+up is one of the most common AZ-104 exam traps. **Load Balancer**
+operates at Layer 4 (TCP/UDP) - it only sees IP addresses and ports, has
+no idea what HTTP even is, and routes based purely on that.
+**Application Gateway** operates at Layer 7 (HTTP) - it can read the
+actual request and route based on URL path or hostname (e.g. `/api/*` to
+one backend pool, everything else to another), terminate SSL for you, and
+optionally run a Web Application Firewall (WAF) in front of your app.
+Rule of thumb: pure TCP-level traffic distribution, use Load Balancer;
+anything that needs to understand HTTP content to route correctly, use
+Application Gateway.
+
+### Public vs Internal Load Balancer
+This lesson's example uses a public IP on the frontend, making it
+internet-facing. Swap that for a private IP instead (an **Internal Load
+Balancer**, sometimes called ILB) and the same resource type distributes
+traffic that should never leave the VNet - e.g. balancing traffic between
+app-tier VMs that only a web tier inside the same network should ever
+reach.
+
 Cost note: Standard Load Balancer bills hourly. Deploy, test, delete same
 day - see the root README cost strategy.
 

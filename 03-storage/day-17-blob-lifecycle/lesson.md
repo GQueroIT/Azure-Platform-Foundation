@@ -1,5 +1,18 @@
 # Day 17 Lesson - Blob Storage and Lifecycle Management
 
+## Core Concepts (Read This First)
+
+### Archive Tier Isn't Instantly Readable
+Worth knowing before you rely on a lifecycle policy that tiers blobs to
+Archive: data in the Archive tier isn't available for immediate read.
+Retrieving it requires a **rehydration** step - moving the blob back to
+Hot or Cool - which can take several hours depending on the priority you
+choose. A lifecycle rule that archives old data is a great cost saver for
+data you rarely need, and a real problem if you ever need that data back
+in a hurry. This is exactly why this lesson's rule tiers to Cool at 30
+days and Archive only at 90 - giving you a slower-but-still-readable
+middle tier before anything becomes hours-to-retrieve.
+
 ## What You're Building Today
 A lifecycle management policy that moves blobs to cheaper tiers over time
 and eventually deletes them.

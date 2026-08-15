@@ -1,5 +1,85 @@
 # Day 01 Lesson - RBAC and Management Groups
 
+## Core Concepts (Read This First)
+
+### What a Management Group Actually Is
+A management group is a container that sits above subscriptions, purely
+for governance - it has nothing to do with billing (that's what a
+subscription is for). Its whole job is letting you assign RBAC roles and
+Azure Policy once, at the top, and have that assignment flow down
+automatically to every subscription, resource group, and resource
+underneath it. Without management groups, a company with 50 subscriptions
+would need to apply the same policy 50 separate times, with 50 separate
+chances to get it wrong or forget one.
+
+### The Hierarchy
+Every Azure tenant has exactly one **Tenant Root Group** at the very top -
+Azure creates it automatically, you can't delete it or move it, and its
+ID is the same as your tenant ID. Every subscription in the tenant lands
+under the Tenant Root Group by default when it's created. Below the root,
+you can build up to **six levels** of your own custom management groups
+(that limit doesn't count the root itself or the subscription level).
+Each management group or subscription can only have one direct parent,
+but a management group can have as many children as you want.
+
+A typical shape looks like: Tenant Root Group -> "Contoso" -> "Production"
+/ "Non-Production" -> individual subscriptions underneath each. Real
+organizations rarely use all six levels - going deeper makes it harder to
+reason about what's inheriting from where.
+
+### Inheritance
+Anything assigned at a management group - a policy, an RBAC role -
+applies to everything below it in the tree, automatically, with no extra
+step. Assign "deny VM creation outside East US" at the "Production"
+management group, and every subscription, resource group, and resource
+under Production inherits that rule the moment it's created, whether or
+not anyone remembers to reapply it. This is the entire reason management
+groups exist.
+
+### Why This Needs a Different Scope Than Everything Else
+Every deployment you've been thinking about so far targets a resource
+group (`az deployment group create`). Management groups don't live inside
+a resource group or a subscription the way most resources do - they sit
+at the very top. Creating one requires deploying at `tenant` scope, using
+`scope: tenant()` on the resource itself. Day 00's "Scope and
+targetScope" section covers this in full if you haven't read it yet.
+
+```bicep
+targetScope = 'tenant'
+
+param mgName string
+param mgDisplayName string
+param parentMgId string   // e.g. your tenant ID, to parent under the Tenant Root Group
+
+resource managementGroup 'Microsoft.Management/managementGroups@2024-02-01-preview' = {
+  scope: tenant()
+  name: mgName
+  properties: {
+    displayName: mgDisplayName
+    details: {
+      parent: {
+        id: '/providers/Microsoft.Management/managementGroups/${parentMgId}'
+      }
+    }
+  }
+}
+```
+
+Deploying this needs `az deployment tenant create`, not the
+`az deployment group` commands you've used so far - and it needs
+Owner-level permission at the tenant scope, a real permission boundary,
+not just a syntax difference. If your account doesn't have that,
+building the hierarchy through the Portal for the lab and only
+referencing it (with `existing`) in Bicep is the realistic path - which
+is exactly what this day's lab objective has you do.
+
+### How This Connects Back to RBAC
+A custom role's `assignableScopes` (below) isn't limited to subscriptions
+- it can point at a management group ID too, meaning "this role can be
+handed out anywhere under this branch of the org," not just one
+subscription. Management groups and RBAC are two separate systems, but
+they're designed to be used together at scale.
+
 ## What You're Building Today
 A management group hierarchy and a custom RBAC role, in Bicep.
 

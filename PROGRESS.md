@@ -64,3 +64,15 @@ not just "mostly true":
 - [ ] Practice exam #2 taken - score: ____
 - [ ] Exam booked - date: ____
 - [ ] Exam passed
+
+
+## Terraform Migration Track
+Start each day here only after the matching Bicep day above is checked
+off. Not part of the AZ-104 definition of done -- this is the
+differentiator track, not the exam-prep track.
+
+- [ ] Day 00 - Terraform Fundamentals (read only, no lab)
+- [ ] Day 01 - RBAC and Management Groups in Terraform
+- [ ] Day 02 - Azure Policy in Terraform
+- [ ] Day 03 - Locks and Budgets in Terraform
+- [ ] At least one lesson written up as a "Bicep vs Terraform" post/video
