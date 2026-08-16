@@ -1,37 +1,59 @@
-# Azure-Platform-Foundation
+#!/usr/bin/env python3
+"""
+Azure-Platform-Foundation - Update Workflow to Phase-Batched
 
-## Scope
-Hands-on Azure build covering the full AZ-104 exam blueprint: Identities and
-Governance, Compute, Storage, Networking, and Monitoring. Built and documented
-phase by phase against an 8-week plan. Every lab is built in the Azure portal
-first, then translated into Bicep, verified, and documented before moving to
-the next objective.
+Replaces the README's "## Daily Loop" section (build one day, portal then
+Bicep, same session) with a "## Workflow: Phase-Batched" section: build
+every day in a phase through the Portal first, tear the whole phase down,
+then do the Bicep pass for the whole phase against a clean resource group,
+tear down again, move to the next phase.
 
-## What This Covers
+Day 14 (Bastion + VPN Gateway) stays an exception either way - it comes
+down the same day it's built, regardless of where the rest of the phase's
+Portal pass stands.
 
-- **01-compute-governance** - management groups, subscriptions, RBAC, Azure
-  Policy, resource locks, budgets, VMs across availability zones, VM Scale Sets
-- **01b-app-hosting** - App Service, Azure Container Apps
-- **02-networking** - VNets, subnets, NSGs, VNet peering, private DNS, Load
-  Balancer, Application Gateway, Bastion, VPN Gateway, Network Watcher
-- **03-storage** - storage accounts, redundancy tiers, blob lifecycle
-  management, Azure Files, SAS tokens, private endpoints
-- **04-identity-access** - Entra ID users/groups, RBAC vs Entra roles,
-  Conditional Access, SSPR, hybrid identity
-- **05-monitoring-backup** - Azure Monitor, Log Analytics, alerts, Azure
-  Backup, Update Management, Azure Arc
+This does NOT touch Terraform, and deliberately says nothing about it -
+Terraform stays its own project after AZ-104, per the original repo scope
+(see New-AzurePlatformFoundationScaffold.py's docstring). Folding a third
+pass into this repo would reopen that decision for no benefit to the AZ-104
+timeline this repo exists to serve.
 
-## How Each Phase Folder Is Organized
+Safe to re-run: skipped if the new section is already present.
 
-Each phase folder contains one subfolder per study day
-(`day-01-rbac-and-management-groups/`, etc). Inside each day's folder:
+Run from anywhere; resolves the repo root from this script's own location
+(python-scripts/, one level below repo root).
+"""
 
-- **lesson.md** - the Bicep lesson for that day, written before you build.
-  No prior coding background assumed.
-- **lab.md** - your portal steps, verification, and write-up for that day
-- **solution.bicep** - your actual Bicep code for that day's build
+import sys
+from pathlib import Path
 
-## Workflow: Phase-Batched (Portal First, Then Bicep)
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parent
+
+if not (REPO_ROOT / "README.md").exists():
+    print(f"ERROR: expected repo root at {REPO_ROOT} but no README.md found there.")
+    print("This script must live in python-scripts/, one level below the repo root.")
+    sys.exit(1)
+
+OLD_DAILY_LOOP = """## Daily Loop
+
+1. Read the lesson (`lesson.md`) for that day
+2. Build it in the Azure Portal first
+3. Translate it to Bicep (`solution.bicep`)
+4. Validate before deploying - `az bicep build`, then
+   `az deployment group validate`, then `az deployment group what-if`.
+   See `assets/validation-guide.md` if you're not sure what these do or
+   why they matter - short answer: they catch mistakes for free, before
+   you pay for anything.
+5. Deploy, and confirm it matches what `what-if` predicted
+6. Verify it actually works the way the lesson said it should
+7. Fill in `lab.md` - steps taken, verification, any issues you hit
+8. Read the lesson's "Why This Matters" section and make sure you could
+   explain it out loud, not just recite it
+9. Commit and push - don't let work sit uncommitted past one session
+10. Confirm nothing billable is left running before you close the laptop"""
+
+NEW_WORKFLOW = """## Workflow: Phase-Batched (Portal First, Then Bicep)
 
 This project runs phase by phase, not strictly day by day. Within a
 phase (e.g. `01-compute-governance`, Days 00-06), every day gets built in
@@ -93,28 +115,30 @@ rushing the Portal pass would.
 6. Commit and push - don't let a phase's Bicep work sit uncommitted.
 7. Tear the phase down again once it's fully deployed clean, documented,
    and committed.
-8. Move to the next phase's Portal pass.
+8. Move to the next phase's Portal pass."""
 
-## Learning Resources
-See `bicep-study-resources.md` at the repo root for every source the lesson
-content in this repo is drawn from, and `assets/validation-guide.md` for
-how to check your Bicep before deploying it. Every lesson also ends with a
-"Why This Matters" section tying that day's work to a real business
-reason - it's worth reading even after you've built the lab.
+MARKER = "## Workflow: Phase-Batched (Portal First, Then Bicep)"
 
-Also at the repo root: `GLOSSARY.md` for any term you hit that isn't
-explained inline, `COST-LOG.md` to track real spend session by session,
-`TROUBLESHOOTING.md` to log real errors and what fixed them, and
-`PROGRESS.md` for the day-by-day checklist and the definition of done
-for the whole build.
 
-## Terraform Migration Track (06-terraform-migration)
+def main():
+    readme_path = REPO_ROOT / "README.md"
+    text = readme_path.read_text(encoding="utf-8")
 
-A second pass through the compute-governance objectives, rebuilt in
-Terraform instead of Bicep. Same Azure concepts, different tool -- the
-point is proving the underlying understanding transfers, not re-learning
-RBAC or Azure Policy from zero.
+    if MARKER in text:
+        print("SKIP: README.md already has the phase-batched workflow section")
+        return
 
-**Sequencing rule:** don't start a Terraform day until the matching Bicep
-day above is fully checked off. See `06-terraform-migration/README.md`
-for the day-by-day breakdown and the reasoning behind the rule.
+    if OLD_DAILY_LOOP not in text:
+        print("ERROR: could not find the expected '## Daily Loop' section in README.md.")
+        print("The README may have been edited since this script was written.")
+        print("No changes made - update the OLD_DAILY_LOOP text in this script to match")
+        print("your current README, or edit README.md by hand instead.")
+        sys.exit(1)
+
+    text = text.replace(OLD_DAILY_LOOP, NEW_WORKFLOW)
+    readme_path.write_text(text, encoding="utf-8")
+    print("UPDATED: README.md - Daily Loop replaced with phase-batched workflow")
+
+
+if __name__ == "__main__":
+    main()

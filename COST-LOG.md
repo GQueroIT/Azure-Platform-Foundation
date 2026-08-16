@@ -13,7 +13,8 @@ doesn't.
 
 | Date | Day | What Ran | Deallocated/Deleted? | Cost This Session | Running Total |
 |------|-----|----------|----------------------|--------------------|----------------|
-|      |     |          |                       |                    |                |
+|   08/12/2026   |  01   |     storageaccount     |     Deallocated      |          $0.00          |       $0.00        |
+|   08/15/2026  |  02   |    n/a      |          n/a            |          $0.00       |       $0.00        |
 
 ## Notes
 - Log every session, even a $0.00 one - the pattern matters as much as
