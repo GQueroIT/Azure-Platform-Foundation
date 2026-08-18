@@ -96,6 +96,78 @@ genuinely painful to hand-write) readable and maintainable. Every piece of
 syntax above exists to cut down on repetition and make the relationships
 between resources explicit.
 
+## Service Deep Dive
+
+### What It Can't Do
+Bicep only talks to Azure Resource Manager. It has no concept of on-prem
+infrastructure, other clouds, or anything outside the ARM control plane -
+if a resource type doesn't have an ARM provider, Bicep can't touch it,
+full stop. It also has no real nested loops: `[for item in collection: {...}]`
+works one level deep on a resource, module, variable, or output, but you
+cannot put a second `[for]` directly inside that block's properties. The
+common workaround is pushing the inner loop into its own module and
+looping over the module call instead, or using the built-in `map()`
+function to flatten the transformation before you loop.
+
+Bicep also doesn't track state the way some other IaC tools do. There's no
+local state file - Azure Resource Manager itself is the source of truth
+for what exists. That sounds convenient (nothing to lose or corrupt
+locally), but it also means Bicep has no built-in way to show you "here's
+what's drifted since I last deployed this" outside of `what-if`, and no
+local record you can inspect offline.
+
+### Nuances Worth Knowing
+- **Deployment mode matters more than it looks.** `az deployment group create`
+  defaults to **Incremental** mode - it only adds or updates what's in the
+  template and leaves everything else in the resource group alone. There's
+  also a **Complete** mode that deletes anything in the resource group
+  *not* declared in the template. Nobody in this repo needs Complete mode,
+  but it's worth knowing it exists so you never accidentally reach for it.
+- **`@secure()` on outputs is a relatively recent addition** (Bicep v0.35+).
+  Before that, any output value - even one built from a `@secure()`
+  parameter - was written to deployment history in plain text and visible
+  to anyone who could read the deployment. If you're ever on an older
+  Bicep CLI version, never output anything secret; wire secrets through
+  directly instead.
+- **Two separate 800-limits exist and they're easy to confuse.** One is a
+  hard cap of 800 stored deployment *records* per resource group - once
+  hit, no new deployment can run until you clear old history (deleting
+  history doesn't touch the actual deployed resources). The other is a cap
+  of 800 total *resources* per single deployment template - and
+  validation counts every iteration of a loop toward that total, including
+  branches that would evaluate to `false` under an `if`. On a repo like
+  this one, where you tear down and redeploy the same resource group
+  nightly, the deployment-history cap is the one you'll actually hit first.
+- The deployment job itself has a 1MB size limit after compression -
+  rarely an issue at this scale, but worth knowing if a template balloons
+  with large inline parameter arrays.
+
+### Troubleshooting You'll Actually Hit
+- **Error:** `The provided value for the template parameter 'adminPassword'
+  is not valid. Expected a value of type 'String, Uri', but received a
+  value of type 'Object'` -> **Cause:** a `@secure()` property nested
+  inside a custom object type, passed through a tool (like a PowerShell
+  cmdlet) that doesn't handle nested secure values correctly ->
+  **Fix:** keep secure values as top-level string/object parameters
+  instead of nesting them inside a custom `type`.
+- **Error:** `The current deployment count is '800'. Please delete some
+  deployments before creating a new one` -> **Cause:** deployment history
+  for the resource group hit its cap from repeated redeploys ->
+  **Fix:** `az deployment group list -g <rg> --query "[].name" -o tsv` to
+  see what's stored, then delete the oldest ones with
+  `az deployment group delete` - this has zero effect on the resources
+  that are actually running.
+- **Symptom:** validation fails with something like `The template
+  resource '...' at line X is not valid` when you try to write a loop
+  inside a loop -> **Cause:** genuine nested `[for]` loops aren't
+  supported -> **Fix:** extract the inner loop into its own module, and
+  call that module from inside the outer loop.
+
+*Checked against: Microsoft Learn's Bicep deployment modes and template
+limits docs, and the Azure/bicep GitHub issue tracker for the nested-loop
+and secure-output behavior.*
+
+
 ## Source
 <https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/file>
 <https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/parameters>

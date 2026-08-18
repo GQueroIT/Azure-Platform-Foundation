@@ -92,6 +92,68 @@ resource vmExtension 'Microsoft.Compute/virtualMachines/extensions@2024-07-01' =
   not just provisioning - the same idea scales up to real config
   management tools later.
 
+## Service Deep Dive
+
+### What It Can't Do
+You can't shrink a managed disk - resize only ever goes up, and there's
+no supported way back down except creating a new, smaller disk and
+copying the data over yourself. OS disks can't be resized online at all;
+only certain data disks support the "expand without downtime" feature,
+and even that has real limits - it's not supported on Ultra Disks or
+Premium SSD v2, not supported on shared disks, and crossing the 4 TiB
+boundary always requires deallocating the VM first regardless of disk
+type, because disks above and below that size use different underlying
+storage back-ends and moving between them needs the disk detached.
+
+A VM extension can also fail in a way that blocks the entire deployment
+from reporting success, even if every other resource in the template
+deployed fine - if the Custom Script Extension's script fails or times
+out, the extension resource itself reports a failed provisioning state,
+and that failure propagates up to the whole deployment.
+
+### Nuances Worth Knowing
+- **Resizing a disk changes the Azure-side size almost immediately, but
+  the operating system inside the VM has no idea** - the OS still sees
+  the old partition size until you go in and extend the
+  partition/filesystem yourself. Two separate steps, easy to do the first
+  and forget the second.
+- **Extension version pinning matters.** `autoUpgradeMinorVersion: true`
+  (used in this lesson's example) means Azure can silently apply newer
+  minor versions of the extension over time - generally fine for
+  something like the Custom Script Extension, but worth knowing if you
+  ever need a script's exact behavior to stay frozen.
+- **A detached data disk keeps its data indefinitely** - since it's an
+  independent top-level resource, deleting the VM it was attached to does
+  not delete the disk unless you explicitly delete the disk too (or the
+  VM was created with the disk set to auto-delete on VM deletion, which
+  is not the default).
+
+### Troubleshooting You'll Actually Hit
+- **Error:** the whole deployment reports as failed, but every resource
+  in the portal looks like it deployed -> **Cause:** a VM extension's
+  `provisioningState` came back `Failed` (usually the Custom Script
+  Extension's script itself erroring or timing out), and that one failure
+  fails the overall deployment -> **Fix:** check the extension's status
+  directly (`az vm extension show` or the portal's "Extensions" blade on
+  the VM) for its actual error output, not just the top-level deployment
+  error.
+- **Symptom:** a disk resize succeeds in Azure but the VM still reports
+  the old, smaller size internally -> **Cause:** resizing the Azure disk
+  object doesn't touch the OS partition table -> **Fix:** extend the
+  partition and filesystem from inside the OS after the Azure-side resize
+  completes (Disk Management on Windows, `growpart`/`resize2fs` or
+  equivalent on Linux).
+- **Symptom:** resizing a data disk unexpectedly requires the VM to be
+  deallocated when you expected it to be online -> **Cause:** the disk is
+  crossing the 4 TiB boundary, or is an Ultra Disk/Premium SSD v2/shared
+  disk type that doesn't support online resize at all -> **Fix:** confirm
+  which category the disk falls into before assuming online resize will
+  work; plan for a deallocate/resize/reallocate window if it doesn't.
+
+*Checked against: Microsoft Learn's "Troubleshoot Azure disk resize
+failures" and "Expand virtual hard disks" docs.*
+
+
 ## Source
 <https://learn.microsoft.com/en-us/azure/templates/microsoft.compute/virtualmachines>
 

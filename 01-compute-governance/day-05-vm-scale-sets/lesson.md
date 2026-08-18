@@ -113,6 +113,67 @@ resource vmss 'Microsoft.Compute/virtualMachineScaleSets@2024-07-01' = {
   - it means changing the model doesn't automatically start replacing
   running instances.
 
+## Service Deep Dive
+
+### What It Can't Do
+Orchestration mode is a one-way door - once a scale set is created as
+Uniform or Flexible, it cannot be converted in place; changing your mind
+means recreating the scale set entirely. Uniform mode, despite being the
+older and still-default-if-unset mode, genuinely can't do several things
+Flexible can: individual instances aren't compatible with standard VM
+APIs, Azure Resource Manager tagging, RBAC scoped to the instance, Azure
+Backup, or Azure Site Recovery - they're only reachable through the
+scale-set-specific API surface. Flexible mode fixes all of that by making
+each instance a real, standalone VM resource under the hood, which is
+exactly why Microsoft now recommends Flexible for basically everything
+new.
+
+A scale set with `capacity: 3` also doesn't scale itself - a bare VMSS
+resource with no attached `Microsoft.Insights/autoscaleSettings` resource
+just runs a fixed number of instances forever, identical to a fixed count
+of individual VMs, until someone manually changes the number.
+Autoscaling is a genuinely separate resource you have to deploy on top.
+
+### Nuances Worth Knowing
+- **VM instances that Flexible mode creates implicitly (through
+  autoscaling, not manually added) don't get default outbound internet
+  access** the way a manually created VM would - a documented, deliberate
+  security default, not a bug, but a real source of "why can't this
+  instance reach the internet" confusion the first time you hit it.
+- **Both orchestration modes cap at 1,000 instances per scale set** - not
+  a limit you'll come close to in this lab, but worth knowing it exists.
+- **A setting called "force strictly even balance across zones" can cause
+  scale-in and scale-out operations to fail outright** if Azure can't
+  maintain perfectly even distribution across zones at that exact
+  moment - it's off by default, but if you ever turn it on expecting
+  stricter guarantees, know that it trades that guarantee for occasional
+  scaling failures instead of a best-effort rebalance.
+
+### Troubleshooting You'll Actually Hit
+- **Symptom:** an instance inside a Flexible-mode scale set can't reach
+  the internet or pull an update, even though the VNet/NSG look fine ->
+  **Cause:** instances created implicitly through autoscaling don't get
+  default outbound access the way manually-created instances do ->
+  **Fix:** attach a NAT Gateway, a public IP, or an explicit outbound
+  rule on a Standard Load Balancer to the subnet or scale set - don't
+  assume default outbound applies here the way it does for a normal VM.
+- **Symptom:** trying to switch an existing scale set's
+  `orchestrationMode` in Bicep fails or gets rejected -> **Cause:**
+  orchestration mode can't be changed after creation -> **Fix:** deploy a
+  new scale set with the correct mode and migrate instances/traffic over;
+  there's no in-place conversion.
+- **Symptom:** an instance stops working and never gets automatically
+  replaced -> **Cause:** automatic instance repair isn't on by default -
+  it requires both a health probe/extension reporting instance health
+  *and* an explicit repair policy configured on the scale set ->
+  **Fix:** confirm both pieces are actually configured; having one
+  without the other means nothing happens when an instance goes
+  unhealthy.
+
+*Checked against: Microsoft Learn's "Orchestration modes for Virtual
+Machine Scale Sets" and the Flexible VMSS migration/networking docs.*
+
+
 ## Source
 <https://azure.github.io/PSRule.Rules.Azure/en/rules/Azure.VMSS.AvailabilityZone/>
 

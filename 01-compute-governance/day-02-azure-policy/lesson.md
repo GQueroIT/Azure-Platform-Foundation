@@ -100,6 +100,72 @@ findable in the Azure Policy portal under Definitions.
   location restriction is just a "Deny" policy, so it doesn't need one -
   you'll see identity blocks show up in later, more complex policies.
 
+## Service Deep Dive
+
+### What It Can't Do
+Policy can't retroactively fix anything by itself. A `Deny` effect blocks
+non-compliant resources at creation time, but existing resources that were
+compliant when created and later drift (or existed before the policy was
+assigned) just sit there marked non-compliant - Policy doesn't reach out
+and fix them. `DeployIfNotExists` and `Modify` effects *can* fix existing
+resources, but only through an explicitly triggered **remediation task**;
+nothing runs automatically against your existing environment just because
+you assigned a policy.
+
+Those same `DeployIfNotExists` and `Modify` effects also can't function
+without a managed identity attached to the policy assignment - that
+identity is what actually performs the remediation deployment, separate
+from whatever evaluates the policy's compliance logic in the first place.
+Forget to give the assignment an identity (or the identity the right RBAC
+role), and remediation tasks fail even though the policy itself looks
+correctly assigned.
+
+Policy also isn't real-time for existing resources: Azure re-evaluates
+compliance across everything already deployed roughly every 24 hours,
+plus whenever you edit the assignment. Don't expect the compliance
+dashboard to reflect a change the moment it happens.
+
+### Nuances Worth Knowing
+- **`DeployIfNotExists` has a configurable evaluation delay, defaulting to
+  10 minutes.** Immediately after a resource is created, Policy waits
+  that long before checking whether the required companion resource
+  exists and deploying it if not. Checking compliance one minute after
+  creating a resource and seeing "non-compliant, nothing happened yet" is
+  expected, not broken.
+- **Remediation only ever touches existing resources, once.** If a
+  remediation task fixes a resource and someone later reverts the change
+  back to non-compliant, the policy will flag it non-compliant again on
+  the next evaluation cycle, but it will not automatically re-remediate -
+  you have to run another remediation task.
+- **`Deny` and `Audit` are what you'll use almost constantly**; `Append`,
+  `Modify`, and `DeployIfNotExists` are the ones that quietly change or
+  add something without you doing anything, which is exactly why they
+  need their own identity and permissions.
+
+### Troubleshooting You'll Actually Hit
+- **Symptom:** a `DeployIfNotExists` policy assignment shows resources as
+  non-compliant, but nothing ever gets deployed for them ->
+  **Cause:** the assignment has no managed identity, or the identity
+  exists but lacks the RBAC role the policy definition requires ->
+  **Fix:** `az policy assignment show --name <name> --query identity` to
+  confirm an identity exists, then check that identity has been granted
+  the role the policy definition specifies it needs.
+- **Symptom:** existing resources from before the policy was assigned
+  stay non-compliant indefinitely -> **Cause:** `DeployIfNotExists`/
+  `Modify` never auto-remediate pre-existing resources -> **Fix:**
+  manually trigger a remediation task against the policy assignment; it's
+  a separate step from assigning the policy itself.
+- **Symptom:** compliance dashboard doesn't reflect a change made minutes
+  ago -> **Cause:** compliance re-evaluation on existing resources runs
+  on roughly a 24-hour cycle, not continuously -> **Fix:** trust
+  `az deployment group what-if` and deployment-time enforcement for
+  anything time-sensitive; treat the dashboard as eventually-consistent,
+  not live.
+
+*Checked against: Microsoft Learn's "deployIfNotExists effect" and
+"Remediate non-compliant resources" docs.*
+
+
 ## Source
 <https://learn.microsoft.com/en-us/azure/governance/policy/assign-policy-bicep>
 

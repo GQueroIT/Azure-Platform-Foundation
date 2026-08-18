@@ -112,6 +112,69 @@ resource vm 'Microsoft.Compute/virtualMachines@2024-07-01' = {
   exactly the resource you deallocate the moment the session ends -
   `az vm deallocate --resource-group <rg> --name vm-web-01`.
 
+## Service Deep Dive
+
+### What It Can't Do
+You can't move a running VM between availability zones - zone placement
+is set at creation and is immutable; changing it means deleting and
+recreating the VM (and anything stateful on it) from scratch. Not every
+VM size is available in every zone of a given region either - a size can
+be available in zones 1 and 2 of a region but not zone 3, so a
+"spread across all zones" design has to be checked against actual
+size-availability for that region, not assumed.
+
+Zone numbers are also logical to your own subscription, not physical -
+"zone 1" in your subscription is not guaranteed to map to the same
+physical datacenter as "zone 1" in a different subscription, even in the
+same region. Don't assume cross-subscription zone alignment means
+anything.
+
+Availability Zones themselves depend on the region actually having
+multiple physically independent datacenters - plenty of Azure regions
+don't support zones at all, and a Bicep deployment that assumes zone
+support in an unsupported region fails outright rather than silently
+falling back to non-zonal placement.
+
+### Nuances Worth Knowing
+- **VM resize can force a restart, or worse, a full deallocation,
+  depending on availability.** Resizing a running VM to a size available
+  on its current hardware cluster just restarts it; resizing to a size
+  that isn't available there requires deallocating first, since Azure has
+  to move the VM to different hardware. Either way, resizing a running VM
+  should be treated as disruptive, not free.
+- **Disk-tier boundaries interact with zone and VM-size choices** -
+  Premium SSD requires certain VM series (the ones with an "s" in the
+  size name, like `Standard_B2s` vs `Standard_B2`) to actually get
+  premium performance; picking a non-"s" size with a Premium disk
+  attached doesn't error, it just silently caps you at the lower-tier
+  disk's throughput characteristics.
+- **The `zones` array takes strings, not integers** - `zones: [ '1' ]`,
+  not `zones: [ 1 ]`. This is a genuinely common first mistake, and
+  Bicep won't always catch it clearly at compile time depending on how
+  it's used.
+
+### Troubleshooting You'll Actually Hit
+- **Error:** deployment fails with something like `SkuNotAvailable` or a
+  zone-related allocation failure for a VM size you know exists in that
+  region -> **Cause:** that specific size isn't available in the
+  specific zone you pinned -> **Fix:** check size availability per zone
+  with `az vm list-skus --location <region> --zone --output table`
+  before committing to a zone in the template, not after.
+- **Symptom:** resizing a running VM hangs or fails, and the VM ends up
+  stuck between states -> **Cause:** the target size isn't available on
+  the current hardware cluster and requires deallocation first, which
+  wasn't done -> **Fix:** deallocate the VM explicitly
+  (`az vm deallocate`), then resize, then start it back up.
+- **Symptom:** a VM attached to a Premium SSD performs like it's on
+  Standard storage -> **Cause:** the VM size doesn't support Premium
+  storage (missing the "s" in the size family) -> **Fix:** confirm the
+  size supports premium storage before attaching a premium disk; check
+  `az vm list-skus` for the `PremiumIO` capability on that size.
+
+*Checked against: Microsoft Learn's "Resize a virtual machine" doc and
+Azure VM SKU/zone availability guidance.*
+
+
 ## Source
 <https://learn.microsoft.com/en-us/azure/templates/microsoft.compute/virtualmachines>
 <https://azure.github.io/PSRule.Rules.Azure/en/rules/Azure.VMSS.AvailabilityZone/>

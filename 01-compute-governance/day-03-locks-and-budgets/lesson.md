@@ -79,6 +79,74 @@ resource monthlyBudget 'Microsoft.Consumption/budgets@2023-11-01' = {
   `amount: 50` and `threshold: 80`, this fires once actual spend crosses
   $40.
 
+## Service Deep Dive
+
+### What It Can't Do
+A `ReadOnly` lock is far more aggressive than its name suggests - it
+doesn't just block deletes and property changes, it blocks *any*
+control-plane POST request, which includes operations that look
+read-only on the surface. The best-known case: a `ReadOnly` lock on a
+storage account blocks the "list keys" operation entirely, because
+listing keys is technically a POST. It also blocks creating new blob
+containers through the control plane, and blocks new RBAC role
+assignments scoped to that storage account. A `ReadOnly` lock on an App
+Service blocks the Kudu console and deployments outright, and on a VM it
+blocks even a restart, since restart is a POST action. None of this is a
+bug - it's locks doing exactly what they're documented to do, and it's
+why the almost-universal guidance is to default to `CanNotDelete` and
+reach for `ReadOnly` only when you specifically mean to freeze
+configuration too.
+
+Neither lock type protects *data* inside a resource. A `CanNotDelete`
+lock on a storage account stops someone from deleting the account
+itself, but does nothing to stop someone from deleting the blobs or
+files inside it - that's a data-plane operation, a different permission
+boundary entirely.
+
+Budgets, as this lesson's Core Concepts section already says, don't cap
+spend - and there's a second gap worth knowing: actual cost data feeding
+a budget can lag real spend by several hours, so a budget alert is a
+same-day warning, not a same-minute one.
+
+### Nuances Worth Knowing
+- **Locks inherit downward and the most restrictive one wins.** A
+  `ReadOnly` lock at the resource group level overrides a resource that
+  has no lock of its own, or even one with a less restrictive
+  `CanNotDelete` lock directly on it.
+- **A `CanNotDelete` lock at the resource-group level can quietly break
+  autoscale-in behavior** for anything that scales by deleting instances
+  (like an Azure ML compute cluster), because scaling in requires
+  deleting the instances being removed - a real, documented interaction,
+  not an edge case.
+- **Removing a lock is instant and low-risk.** A lock is a lightweight
+  resource with essentially one meaningful property (`level`), so taking
+  one off to make an emergency change and reapplying it afterward is a
+  normal, safe operation, not something to be nervous about.
+
+### Troubleshooting You'll Actually Hit
+- **Symptom:** can't retrieve a storage account's access keys even as the
+  account owner -> **Cause:** a `ReadOnly` lock is applied somewhere in
+  the resource's scope chain (on the account itself or an ancestor
+  resource group) -> **Fix:** locate and remove the lock
+  (`az lock list --resource-group <rg>`), retrieve the keys, then decide
+  whether `ReadOnly` was really the intended lock level - `CanNotDelete`
+  is usually what people actually meant.
+- **Symptom:** a VM won't restart, or an App Service deployment silently
+  fails with a permissions-flavored error, despite the account clearly
+  having Owner/Contributor -> **Cause:** RBAC isn't the blocker - a lock
+  is, since locks apply on top of RBAC regardless of role -> **Fix:**
+  check for locks specifically (`az lock list`), not just role
+  assignments, whenever a should-have-permission action fails.
+- **Symptom:** a budget alert email never arrives even though spend is
+  well past the threshold -> **Cause:** cost data has a real reporting
+  lag (up to several hours) before it's reflected against the budget ->
+  **Fix:** treat budget alerts as a same-day signal, not real-time, and
+  don't rely on them for anything that needs a faster reaction than that.
+
+*Checked against: Microsoft Learn's "Lock your Azure resources" doc and
+its storage-account-specific lock article.*
+
+
 ## Source
 <https://learn.microsoft.com/en-us/azure/cost-management-billing/costs/quick-create-budget-bicep>
 <https://learn.microsoft.com/en-us/azure/templates/microsoft.consumption/budgets>
