@@ -1,0 +1,41 @@
+# PowerShell Glossary
+
+Terms from Lessons 1–7, in the order they first come up.
+
+- **Shell**: an interactive command environment — type a command, see output. PowerShell is a shell and a scripting language at once.
+- **Cmdlet**: a built-in PowerShell command, always named Verb-Noun (`Get-AzVM`, `New-AzResourceGroup`).
+- **`.ps1` file**: a saved PowerShell script.
+- **`pwsh`**: the PowerShell 7 executable on Linux/RHEL (as opposed to `powershell`, which is Windows PowerShell 5.1 and doesn't exist on Linux).
+- **Execution policy**: a Windows-only restriction on running scripts; not enforced by default on Linux, so `.ps1` files run without the policy errors Windows beginners commonly hit.
+- **`Get-Help`**: shows documentation for any cmdlet, including your own scripts if they have comment-based help.
+- **`Get-Command`**: searches for cmdlets by name or wildcard.
+- **`Get-Member`**: lists every property and method on whatever object is piped into it — the main tool for discovering what an object contains.
+- **Variable**: `$name = value`. Dynamically typed — no type declared up front.
+- **String interpolation**: embedding a variable directly in a double-quoted string (`"Hello $name"`); doesn't happen in single-quoted strings.
+- **`$()` subexpression**: wraps an expression (a property, a method call) so it can be embedded inside a string.
+- **Array**: an ordered list, `@("a", "b", "c")`. Fixed-size under the hood — `+=` creates a new array, not an in-place append.
+- **Hashtable**: key-value pairs, `@{ Key = "value" }` — PowerShell's equivalent of a Python dict.
+- **Pipeline**: passing the output object of one cmdlet as input to the next, via `|`.
+- **Object** (vs. text stream): structured data with named properties — the core difference between PowerShell and Bash.
+- **`$_`**: "the current object in the pipeline" — used inside script blocks passed to `Where-Object`, `ForEach-Object`, etc.
+- **`Where-Object`**: filters pipeline objects by a condition.
+- **`Select-Object`**: picks specific properties, or the first/last N objects, from the pipeline.
+- **`Sort-Object`**: sorts pipeline objects by a property.
+- **`ForEach-Object`**: cmdlet that runs a script block once per pipeline object, as it flows through.
+- **`foreach`**: language keyword that loops over a collection already loaded in memory — distinct from the `ForEach-Object` cmdlet above.
+- **Calculated property**: `@{Name="Label"; Expression={...}}` inside `Select-Object` — defines a new output column instead of just picking an existing one.
+- **Function**: a named, reusable block of PowerShell code, declared with `function Verb-Noun { ... }`.
+- **`param()`**: declares what a function or script accepts as input.
+- **Mandatory parameter**: `[Parameter(Mandatory = $true)]` — PowerShell refuses to run without a value supplied.
+- **`[CmdletBinding()]`**: turns a plain function into an advanced function that supports common parameters like `-Verbose` and `-WhatIf`.
+- **`ShouldProcess` / `-WhatIf`**: built-in dry-run support for functions marked `SupportsShouldProcess` — the PowerShell equivalent of `az deployment group what-if`.
+- **Context** (`Get-AzContext`): the currently authenticated account, tenant, and subscription that Az cmdlets operate against.
+- **`Connect-AzAccount`**: authenticates the session against Azure Resource Manager.
+- **Service principal**: an application identity used for unattended/automated authentication, instead of a personal login.
+- **Managed identity**: an identity Azure automatically assigns to a resource (VM, Function App), removing the need to store any secret at all.
+- **Microsoft Graph PowerShell SDK**: separate module from Az, used for Entra ID (`Get-MgUser`, `Get-MgGroup`) — talks to the Graph API rather than Azure Resource Manager.
+- **Scope** (Graph): a specific permission requested when connecting (`Connect-MgGraph -Scopes 'User.Read.All'`) — request only what a script actually needs.
+- **Comment-based help**: the `<# .SYNOPSIS ... #>` block at the top of a script that makes `Get-Help` work on it.
+- **Terminating vs. non-terminating error**: terminating errors stop the script and are catchable with `try/catch`; non-terminating errors print a warning and continue unless forced to stop with `-ErrorAction Stop`.
+- **`-ErrorAction Stop`**: forces a normally non-terminating cmdlet failure to become catchable.
+- **Exit code**: `exit 0` (success) or `exit 1` (failure) — how a script signals success/failure to anything calling it, without parsing output text.
