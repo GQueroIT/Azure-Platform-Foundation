@@ -84,6 +84,63 @@ resource peeringBtoA 'Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2
   same relationship (one VNet offers its gateway, the other uses it) -
   they show up again if you build the VPN Gateway lab this week.
 
+## Service Deep Dive
+
+### What It Can't Do
+Peering can't route through a gateway automatically. If VNet A has a VPN
+Gateway or ExpressRoute connection that VNet B needs to use, that
+requires explicitly enabling gateway transit on A's side
+(`allowGatewayTransit`) and remote gateways on B's side
+(`useRemoteGateways`) - leave either off and the peering update itself
+fails, not just silently declines to route.
+
+A private DNS zone by itself resolves nothing across a peering, even
+with correct records - Azure's default DNS resolver (168.63.129.16)
+only resolves names for VMs in the same VNet or a directly linked
+private DNS zone; being peered doesn't automatically extend that.
+
+Address spaces can't overlap between peered VNets - if both happen to
+use the same range (common when two teams each grab 10.0.0.0/16
+independently), peering can't be established until one is readdressed.
+
+### Nuances Worth Knowing
+- Peering requires links from both sides. If only one side is created,
+  the peering state shows "Initiated," not "Connected" - traffic doesn't
+  flow in that state, and it's easy to miss since the portal doesn't
+  loudly flag it as broken.
+- A peering stuck "Disconnected" can't just be edited back to health -
+  the fix is deleting the peering from both sides and recreating both
+  links from scratch.
+- Route propagation after creating or changing a peering isn't instant -
+  it can take a few minutes, so "resources can't reach each other yet"
+  right after standing up a peering is often just propagation delay.
+- A VM peered and DNS-linked correctly for the same-VNet case can still
+  fail cross-VNet name resolution intermittently - a documented
+  real-world pattern that often traces back to client-side DNS caching
+  or which specific DNS server the VM's NIC is actually using, not the
+  peering or zone configuration itself.
+
+### Troubleshooting You'll Actually Hit
+- **Symptom:** two VNets are peered but resources can't reach each other
+  at all -> **Cause:** peering status shows "Initiated" instead of
+  "Connected" - only one side created its half -> **Fix:** create the
+  missing peering resource on the other VNet.
+- **Symptom:** a VM can ping another VM's private IP across the peering
+  but not by hostname -> **Cause:** DNS resolution isn't automatic
+  across a peering -> **Fix:** link a Private DNS Zone to both VNets (or
+  configure custom DNS servers both point to), and confirm actual
+  records exist for the names being resolved.
+- **Error:** enabling `useRemoteGateways` fails or is rejected ->
+  **Cause:** the corresponding `allowGatewayTransit` wasn't set on the
+  VNet that actually owns the gateway -> **Fix:** set gateway transit on
+  the gateway-owning VNet's peering first, then remote gateways on the
+  other side.
+
+*Checked against: Microsoft Learn's "Troubleshoot virtual network
+peering issues" and "Troubleshoot virtual network peering route
+propagation and sync problems" docs.*
+
+
 ## Source
 <https://learn.microsoft.com/en-us/azure/templates/microsoft.network/virtualnetworks/virtualnetworkpeerings>
 

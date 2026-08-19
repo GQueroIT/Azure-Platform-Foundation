@@ -75,6 +75,72 @@ resource cpuAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = {
   behavior on its own, but downstream automation and dashboards often
   filter or sort by it.
 
+## Service Deep Dive
+
+### What It Can't Do
+Notification actions aren't treated equally under the hood - SMS, voice,
+and email are all rate limited per phone number/address, but webhooks,
+Functions, and Logic App actions aren't rate limited at all. SMS and
+voice are capped at one notification every 5 minutes per number; email
+is capped at 100 messages per hour per address. Cross a threshold and
+Azure doesn't queue the extras for later - they're dropped, with only a
+separate notification saying rate limiting kicked in. This is an actual
+AZ-104 exam topic: an alert firing every minute for an hour produces
+roughly 60 emails but only about 12 SMS messages, purely from these two
+different caps.
+
+Metric alerts are also stateful by default - once an alert fires on a
+specific metric time series, it won't fire again for that series until
+the condition clears (three consecutive evaluations without it being
+met) and re-triggers. Deliberate noise reduction, not a bug, but it
+means "the alert only notified me once even though the CPU stayed high
+for an hour" is expected behavior.
+
+### Nuances Worth Knowing
+- If genuinely continuous notifications are needed, that requires
+  explicitly making the alert rule stateless (`autoMitigate: false` in
+  Bicep/ARM, or unchecking "Automatically resolve alerts" in the
+  portal) - the default stateful behavior otherwise suppresses repeat
+  notifications on purpose.
+- Dynamic thresholds need real history before they mean anything -
+  Microsoft's own guidance is a minimum of 3 days and 30 metric samples
+  before a dynamic threshold becomes active. A dynamic-threshold alert
+  on a resource created minutes ago has nothing to learn from yet.
+- Action groups aren't capped per subscription (effectively unlimited),
+  but an alert rule's combined properties (query, dimensions,
+  description, referenced action groups) can't exceed 64 KB - a large
+  KQL query with many dimensions can hit this ceiling and fail at
+  creation with a vague "there was a problem with the server" error that
+  doesn't obviously point at size as the cause.
+- A fired alert visible in the portal but with no SMS/voice/push
+  actually delivered is very often an alert processing rule silently
+  suppressing that action (e.g. a maintenance-window suppression rule) -
+  worth checking before assuming the action group itself is broken.
+
+### Troubleshooting You'll Actually Hit
+- **Symptom:** an alert is clearly firing repeatedly in the portal, but
+  notifications stopped arriving partway through -> **Cause:** the
+  per-recipient rate limit was hit and the excess notifications were
+  simply dropped -> **Fix:** confirm this by checking for the rate-limit
+  notice sent to that address/number, then reduce alert noise at the
+  source or route high-volume notifications through a non-rate-limited
+  action type like a webhook instead.
+- **Symptom:** a condition stays true for a long stretch but only one
+  notification ever arrived -> **Cause:** the metric alert is stateful
+  by default and deliberately doesn't re-notify on the same ongoing
+  issue -> **Fix:** if repeat notifications are actually wanted,
+  explicitly set the rule to stateless (`autoMitigate: false`).
+- **Symptom:** creating an alert rule fails with a vague server error ->
+  **Cause:** the combined size of the rule's query, dimensions,
+  description, and action group references exceeded 64 KB -> **Fix:**
+  simplify the query or split an overly broad multi-dimension rule into
+  smaller, more targeted rules.
+
+*Checked against: Microsoft Learn's "Create and manage action groups in
+Azure Monitor," "Troubleshooting Azure Monitor alerts and
+notifications," and "Troubleshoot Azure Monitor metric alerts" docs.*
+
+
 ## Source
 <https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/resource-manager-action-groups>
 

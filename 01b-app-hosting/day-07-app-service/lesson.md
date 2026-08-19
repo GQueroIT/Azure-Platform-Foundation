@@ -82,6 +82,67 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
   here just like it did for storage accounts.
 - `linuxFxVersion` sets the runtime stack. Format is always `RUNTIME|VERSION`.
 
+## Service Deep Dive
+
+### What It Can't Do
+F1/D1 aren't just "no custom domain" tiers - they carry hard daily quotas
+that stop the app outright. Free tier gets 60 CPU minutes per day (reset
+at midnight UTC), plus a rolling 5-minute CPU quota, plus bandwidth,
+memory, and filesystem caps. Cross any of them and the app returns a 403
+"Quota Exceeded" page for the rest of that window - a full stop, not a
+slowdown. Background processes (WebJobs, health-check pings, even
+platform diagnostics) burn this quota even when nobody is visiting the
+site, which is exactly why a lab app with near-zero real traffic can
+still hit it.
+
+Free tier also has no Always On - idle apps unload after roughly 20
+minutes, so the next request pays a cold start. Always On itself doesn't
+exist below Basic tier. And SNAT limits apply here too, unrelated to CPU
+quota: each App Service worker gets 128 preallocated SNAT ports for
+outbound connections to the same address+port combination, and that
+limit bites even on paid tiers under real load.
+
+### Nuances Worth Knowing
+- A deployment slot swap doesn't move everything, and which settings move
+  is easy to get backward. Settings marked "Deployment slot setting"
+  (sticky) stay with the slot and don't swap; unmarked settings swap with
+  the code. Forgetting to mark a staging-only connection string as sticky
+  is a real, common way for the wrong database to end up live in
+  production after a swap.
+- Not every setting respects stickiness even when marked - a documented
+  case found `healthCheckPath` swapping despite being expected to stay
+  put, so "sticky" isn't airtight for every property. "Swap with Preview"
+  shows exactly what will move before it happens, rather than trusting
+  the marking blindly.
+- Custom domains, TLS/SSL bindings, scale settings, and Always On itself
+  are always slot-specific and never swap, regardless of any setting -
+  no marking required or possible.
+
+### Troubleshooting You'll Actually Hit
+- **Error:** "Quota Exceeded," app returns 403 and won't load even though
+  traffic looks light -> **Cause:** F1/D1's daily or 5-minute CPU quota
+  was hit, often from background processes rather than real visits ->
+  **Fix:** check the App Service Plan > Quotas blade for which quota
+  tripped and its reset countdown; for a lab, wait it out - for anything
+  real, move off Free/Shared tier.
+- **Symptom:** after a slot swap, production is suddenly pointed at the
+  wrong database or config -> **Cause:** a setting that should have been
+  marked sticky wasn't, so it swapped along with the code -> **Fix:**
+  use "Swap with Preview" before swapping for real, and mark
+  environment-specific settings (connection strings, per-slot secrets)
+  as sticky consistently in both slots.
+- **Symptom:** intermittent failed or slow outbound calls to the same
+  external API or database under load -> **Cause:** SNAT port
+  exhaustion, same root cause as Day 13's Load Balancer -> **Fix:**
+  reuse/dispose HttpClient and connection objects instead of opening new
+  ones per call, or route the destination through a service/private
+  endpoint, which sidesteps the SNAT limit entirely.
+
+*Checked against: Microsoft Learn's "Azure App Service quotas and
+metrics," "Troubleshoot intermittent outbound connection errors," and
+"Set up staging environments" docs.*
+
+
 ## Source
 <https://github.com/MicrosoftDocs/azure-docs/blob/main/articles/app-service/samples-bicep.md>
 

@@ -75,6 +75,75 @@ resource privateEndpoint 'Microsoft.Network/privateEndpoints@2023-11-01' = {
   (`az storage container generate-sas`) or the portal, since a SAS token
   is a signed credential with an expiry, not infrastructure.
 
+## Service Deep Dive
+
+### What It Can't Do
+Creating a private endpoint doesn't automatically disable the storage
+account's public endpoint - those are two separate settings. Deploying a
+private endpoint and leaving public network access enabled leaves the
+resource reachable both ways at once, which defeats the isolation goal
+if the intent was "private only." A private endpoint also doesn't make
+DNS resolve correctly by itself - creating it creates a private IP, but
+nothing automatically points client DNS lookups at it; that requires a
+Private DNS Zone actually linked to the VNet the client sits in.
+
+A SAS token can't be selectively revoked once issued unless it was built
+around a stored access policy - a SAS generated directly against account
+keys is valid until it expires, full stop; the only way to kill it early
+is rotating the account keys themselves, which invalidates every other
+SAS issued from those same keys at the same time, not just the one meant
+to be revoked.
+
+### Nuances Worth Knowing
+- The single most common private endpoint failure isn't actually a
+  private-endpoint problem, it's DNS - and it typically shows up as a
+  403 "This TCP connection does not allow access" error from the
+  resource's firewall, because the client resolved the *public* hostname,
+  connected over the public endpoint, and got rejected by the exact
+  firewall rule the private endpoint was supposed to make irrelevant.
+- If a VNet uses custom DNS servers instead of Azure-provided DNS,
+  linking the Private DNS Zone to the VNet isn't enough by itself - the
+  custom DNS server also has to forward `privatelink.*` queries
+  specifically to Azure's DNS resolver (168.63.129.16), or it never even
+  asks Azure DNS about the private zone.
+- A private endpoint connection can sit in a Pending state even after
+  setup looks complete - this happens for cross-subscription or
+  cross-tenant connections, where the resource owner has to manually
+  approve the connection before any traffic flows.
+- User Delegation SAS tokens are capped at a maximum lifetime of 7 days
+  when re-authentication isn't required within that window - unlike
+  Account or Service SAS, which can be issued with much longer
+  expirations.
+
+### Troubleshooting You'll Actually Hit
+- **Error:** "403 - This TCP connection does not allow access to {host}"
+  on a resource with a private endpoint configured -> **Cause:** almost
+  always DNS resolving the public hostname to the public IP instead of
+  the private endpoint's IP, so the firewall rejects the connection as
+  if the private endpoint didn't exist -> **Fix:** `nslookup` the
+  hostname from a VM inside the VNet - if it returns a public IP, check
+  the Private DNS Zone is linked to that specific VNet, and if custom
+  DNS is in play, confirm it forwards `privatelink.*` queries to Azure
+  DNS.
+- **Symptom:** a private endpoint was created and everything else looks
+  correct, but traffic doesn't flow -> **Cause:** the connection is
+  sitting Pending, which happens by design for cross-subscription/
+  cross-tenant private endpoints until the resource owner approves it ->
+  **Fix:** check the connection's status on the target resource itself
+  and approve it if Pending.
+- **Symptom:** DNS resolves to the private IP on one attempt and the
+  public IP on the next, intermittently -> **Cause:** commonly multiple
+  DNS paths in play at once (a custom forwarder alongside Azure-provided
+  DNS, or stale caching from before the zone was linked) -> **Fix:**
+  flush the client's DNS cache, and confirm there's exactly one
+  consistent resolution path rather than a mix of custom and
+  Azure-provided DNS.
+
+*Checked against: Microsoft Learn's "Troubleshoot private endpoint DNS
+resolution failure" and "Troubleshoot 403 access denied errors ...
+through an approved private endpoint" docs.*
+
+
 ## Source
 Private endpoint pattern from <https://shakeeljuancalleghani.medium.com/mastering-azure-bicep-deploy-storage-account-containers-lifecycle-management-policies-and-56d130aae48b>
 

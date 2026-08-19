@@ -95,6 +95,62 @@ resource nsg 'Microsoft.Network/networkSecurityGroups@2023-11-01' = {
   (not shown above for brevity, but you'll need it to actually apply
   these rules).
 
+## Service Deep Dive
+
+### What It Can't Do
+Azure reserves five IP addresses in every subnet, not one - the network
+address, three Azure reserves for its own use (default gateway and DNS
+mapping), and the broadcast address at the top. A /24 subnet's 256
+addresses isn't actually 256 usable ones, it's 251. This catches people
+sizing subnets right at the edge of what they think they need.
+
+NSGs also can't do stateful application-layer inspection - they filter
+on the classic five-tuple (source/destination IP, source/destination
+port, protocol), not on what's actually inside the packet. "Block
+malicious HTTP payloads" is Azure Firewall or a WAF's job, not an NSG's.
+
+A subnet or NIC can only have one NSG at a time - no stacking two
+directly on the same subnet - though a subnet's NSG and a NIC's NSG
+absolutely can both be in play for the same VM simultaneously, which is
+where "traffic has to pass both" comes from.
+
+### Nuances Worth Knowing
+- The default rules (AllowVNetInBound, AllowAzureLoadBalancerInBound,
+  DenyAllInBound, and their outbound equivalents) can never be deleted
+  or edited, only overridden with a higher-priority (lower number)
+  custom rule. In the portal they show grayed out, which sometimes gets
+  mistaken for "disabled" - they're still fully active, just read-only.
+- Rule evaluation order differs by traffic direction: inbound traffic
+  hits the subnet-level NSG first, then the NIC-level NSG; outbound hits
+  the NIC-level NSG first, then subnet-level. Getting this backward is a
+  common source of "I fixed the rule but it's still blocked" when the
+  block is actually happening at the other level.
+- NSG flow logs (the older diagnostic tool) are being retired in favor
+  of Virtual Network flow logs - if a tutorial or older reference
+  mentions the former, that's the path going away, not the one to build
+  against now.
+
+### Troubleshooting You'll Actually Hit
+- **Symptom:** a deployment fails validation with something like "the
+  specified address prefix is fully utilized" for a subnet that "should"
+  have room -> **Cause:** forgetting Azure reserves 5 addresses per
+  subnet -> **Fix:** size subnets with that reservation in mind - a /28
+  for a handful of VMs, not a raw headcount match.
+- **Symptom:** traffic is blocked and a specific rule that should allow
+  it looks completely correct -> **Cause:** the block is coming from the
+  *other* NSG in the chain (subnet-level vs NIC-level) -> **Fix:** check
+  both NSGs attached to the resource's traffic path, and remember the
+  evaluation order differs for inbound vs outbound.
+- **Error:** `InUseNetworkSecurityGroupCannotBeDeleted` /
+  `InUseSubnetCannotBeDeleted` when tearing down a resource group ->
+  **Cause:** the NSG or subnet still has something attached to it (a
+  NIC, a peering, a private endpoint) -> **Fix:** the error message
+  lists exactly what's still attached - detach or delete that first.
+
+*Checked against: Microsoft Learn's "Network security groups overview"
+and Azure networking documentation on subnet address reservation.*
+
+
 ## Source
 <https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/scenarios-virtual-networks>
 <https://azure.github.io/PSRule.Rules.Azure/en/rules/Azure.NSG.AnyInboundSource/>

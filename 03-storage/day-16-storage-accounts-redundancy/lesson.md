@@ -64,6 +64,65 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2025-06-01' = {
   explicitly rather than relying on whatever the platform default happens
   to be - it blocks anonymous public read access at the account level.
 
+## Service Deep Dive
+
+### What It Can't Do
+Not every redundancy conversion is a one-step toggle, despite the portal
+presenting them all as a dropdown. Direct GZRS -> LRS, GRS -> ZRS, and
+ZRS -> GRS conversions aren't supported at all - each requires a staged,
+two-step conversion through an intermediate SKU, with a mandatory
+72-hour wait enforced between the two steps to let background
+replication catch up. A storage account with boot diagnostics enabled
+for a VM can't convert to ZRS or GZRS at all until boot diagnostics is
+disabled first - and once disabled to allow the conversion, it can't be
+re-enabled afterward without further changes. An account holding blobs
+in the Archive tier can't move to a zone-redundant option either -
+Archive isn't supported there, so those blobs have to be rehydrated to
+Hot or Cool first, which is itself slow and can be genuinely costly.
+
+### Nuances Worth Knowing
+- Redundancy conversions don't cause downtime or data loss for most
+  account types - access continues normally during the switch. The one
+  documented exception: accounts with a hierarchical namespace enabled
+  (Data Lake Storage Gen2) can see a brief pause, under 30 seconds,
+  while the account switches over.
+- Enabling geo-redundancy (moving to GRS/GZRS) triggers a one-time
+  egress charge to replicate existing data to the secondary region - a
+  real, billed event, not a free background sync.
+- Failing a GRS account over to its secondary region during a real
+  outage doesn't preserve geo-redundancy afterward - the account becomes
+  LRS in the new primary region, and it specifically can't convert
+  straight back to ZRS or GZRS from that state; getting zone-redundancy
+  back requires a manual migration, not just flipping the setting again.
+- Storage account names are globally unique across all of Azure, not
+  just your subscription - lowercase letters and numbers only, 3-24
+  characters. That's exactly why this lesson's Bicep uses
+  `uniqueString(resourceGroup().id)` rather than a fixed name - a fixed
+  name has a real chance of colliding with someone else's account
+  somewhere in the world.
+
+### Troubleshooting You'll Actually Hit
+- **Error:** converting an account's redundancy fails outright with an
+  unsupported-conversion error -> **Cause:** the specific direction
+  attempted (GZRS->LRS, GRS->ZRS, or ZRS->GRS) isn't a supported direct
+  conversion -> **Fix:** check Microsoft's redundancy conversion matrix
+  for the actual supported path - almost always a two-step conversion
+  with a mandatory 72-hour wait between steps.
+- **Error:** `StorageAccountTypeNotSupported` when starting a VM, or a
+  redundancy conversion silently fails -> **Cause:** boot diagnostics is
+  enabled on a VM using this storage account, which blocks
+  zone-redundant conversions entirely -> **Fix:** disable boot
+  diagnostics on the account first if the conversion needs to go through.
+- **Error:** deployment fails with a storage account name conflict even
+  though it looks unique -> **Cause:** storage account names are
+  globally unique across every Azure customer, not just your own
+  subscription -> **Fix:** use `uniqueString()` or another
+  guaranteed-unique naming pattern instead of a fixed, guessable name.
+
+*Checked against: Microsoft Learn's "Change how a storage account is
+replicated" and "Storage redundancy change FAQs" docs.*
+
+
 ## Source
 <https://learn.microsoft.com/en-us/azure/templates/microsoft.storage/storageaccounts>
 

@@ -111,6 +111,69 @@ resource vpnGateway 'Microsoft.Network/virtualNetworkGateways@2023-11-01' = {
   deployment "succeeds" - the resource exists but isn't fully ready
   immediately. Budget real time for this specific lab.
 
+## Service Deep Dive
+
+### What It Can't Do
+Basic SKU Bastion (this lesson's build) can't do file upload/download
+through the portal at all - that's only available through a native
+RDP/SSH client, and only from Standard SKU up. Basic also can't use
+custom ports, IP-based connections, or host scaling - it's fixed at two
+instances with no way to add more.
+
+The GatewaySubnet has hard, non-negotiable requirements: named exactly
+`GatewaySubnet`, sized at least /27, and no NSG, route table, or other
+resource attached to it - genuinely can't, not just shouldn't. Azure
+refuses or fails the deployment if any of these are violated.
+AzureBastionSubnet has its own separate, equally strict requirement:
+exactly that name, minimum /26 (not /27 - that changed in November 2021,
+so older /27 deployments only still work because they predate the
+change), and no other resources or route tables in it either.
+
+Basic SKU VPN Gateway is treated as legacy - current guidance is
+VpnGw1 and above, and mixing SKUs (a Basic gateway with a Standard-SKU
+public IP) is a real, documented cause of deployment failure, not a
+style preference.
+
+### Nuances Worth Knowing
+- A brand-new VPN Gateway deployment isn't fast - creating the gateway
+  resource itself commonly takes 30-45 minutes even when everything is
+  configured correctly, easy to mistake for a stuck deployment given how
+  quickly most other resources in this repo deploy.
+- Site-to-Site connections are policy-based or route-based, and
+  mismatched Security Association settings or "one tunnel per subnet
+  pair" expectations between Azure and an on-prem device are a
+  documented cause of *intermittent* (not permanent) disconnects - it
+  looks unstable rather than broken, which sends people looking in the
+  wrong place first.
+- A user-defined route accidentally placed on the GatewaySubnet is a
+  documented, sneaky cause of "the tunnel shows Connected but traffic
+  still doesn't flow correctly for some destinations" - it's allowed to
+  exist there in ways that don't block deployment but do quietly break
+  specific traffic paths.
+
+### Troubleshooting You'll Actually Hit
+- **Error:** Bastion deployment fails validation -> **Cause:** almost
+  always the subnet name isn't exactly `AzureBastionSubnet`, or it's
+  smaller than /26 -> **Fix:** rename/resize the subnet to match exactly
+  - no flexibility here, unlike most subnet naming elsewhere in this
+  repo.
+- **Error:** VPN Gateway deployment fails or times out -> **Cause:**
+  most commonly the GatewaySubnet is undersized (below /27), misnamed,
+  or has an NSG/route table attached; a Basic-SKU gateway paired with a
+  non-Basic public IP is another frequent cause -> **Fix:** confirm
+  GatewaySubnet is named exactly that, sized /27+, has nothing else
+  attached, and that gateway/IP SKUs match.
+- **Symptom:** a Site-to-Site connection shows Connected but specific
+  traffic still doesn't reach its destination -> **Cause:** frequently a
+  UDR on the GatewaySubnet quietly overriding the expected path ->
+  **Fix:** check for and remove any route table on the GatewaySubnet
+  before assuming the VPN configuration itself is wrong.
+
+*Checked against: Microsoft Learn's "Azure Bastion FAQ," "About Azure
+Bastion configuration settings," and "Troubleshoot an Azure S2S VPN
+connection" docs.*
+
+
 ## Source
 <https://github.com/Azure/azure-quickstart-templates/blob/master/quickstarts/microsoft.network/azure-bastion/main.bicep>
 <https://learn.microsoft.com/en-us/azure/templates/microsoft.network/virtualnetworkgateways>

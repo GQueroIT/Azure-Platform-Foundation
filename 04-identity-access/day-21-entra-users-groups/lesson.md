@@ -54,6 +54,69 @@ resource securityGroup 'Microsoft.Graph/groups@v1.0' = {
   combination for a plain security group (as opposed to a Microsoft 365
   group, which is the opposite).
 
+## Service Deep Dive
+
+### What It Can't Do
+The Graph extension's supported resource list is genuinely narrow, and
+even within Groups real gaps exist. A single Groups resource can't
+declare more than 20 members or owners - go over that and deployment
+fails outright with a 400 error, with nothing in the syntax warning
+about the wall in advance. Role-assignable groups (`isAssignableToRole:
+true`) look fully supported in the schema, but deploying one fails
+regardless of permissions - it's declared but not actually deployable
+through this extension yet; the documented workaround is a
+`DeploymentScript` resource calling Microsoft Graph directly instead.
+
+`what-if` doesn't work against Graph resources at all - none of the
+preview-before-deploy safety net this repo has relied on since Day 00
+applies here. Neither do deployment stacks or verbose deployment output.
+And deployed Graph resources genuinely don't show up on the Azure
+portal's deployment details page - only true ARM resources do, so
+confirming a Graph deployment succeeded means checking Entra ID
+directly, not the deployment history checked for everything else in
+this repo.
+
+### Nuances Worth Knowing
+- If a Graph resource created through Bicep gets deleted some other way
+  (portal, PowerShell, Graph API directly), redeploying the same Bicep
+  file doesn't recreate it cleanly - it throws a conflict error about
+  the unique name still technically existing in a deleted state. The fix
+  is one of three specific paths: permanently purge the deleted item,
+  restore it, or change the unique name in the Bicep file and redeploy
+  under a new identity.
+- App-only deployment (the kind used in most CI/CD pipelines) can't
+  declare a group with a `membershipRule` (dynamic membership) - that
+  combination fails with an explicit "AppOnly OBO tokens not supported"
+  error, because dynamic membership evaluation doesn't support the
+  automation flow app-only deployments use.
+- Application passwords (`passwordCredentials`) aren't supported on
+  `applications` or `servicePrincipals` resources - only `keyCredentials`
+  (certificates) are. A genuinely required password/secret is another
+  `DeploymentScript`-calls-Graph workaround, not a native Bicep property.
+
+### Troubleshooting You'll Actually Hit
+- **Error:** a Groups resource deployment fails with a 400 error and no
+  obviously wrong syntax -> **Cause:** likely more than 20 members
+  and/or owners declared on that single group -> **Fix:** split
+  membership assignment across multiple deployments/operations rather
+  than declaring everyone in one Groups resource block.
+- **Error:** redeploying a previously-working file fails with a
+  conflict about a group name that "already exists" even though it's
+  gone from the portal -> **Cause:** the group was deleted outside of
+  Bicep and Entra still holds it in a soft-deleted state under that
+  unique name -> **Fix:** purge or restore the deleted item through
+  Graph, or change the Bicep file's unique name and redeploy fresh.
+- **Symptom:** a deployment managing Graph resources "succeeds" per the
+  CLI, but nothing shows up in the Azure portal's deployment history ->
+  **Cause:** expected, not a failure - the portal's deployment details
+  page doesn't display Microsoft Graph resources at all -> **Fix:**
+  verify success directly in Entra ID or via Graph API/PowerShell.
+
+*Checked against: Microsoft Learn's "Known issues: Microsoft Graph Bicep
+Templates" and "Microsoft Graph Bicep Feature Limitations and
+Restrictions" docs.*
+
+
 ## Source
 <https://devblogs.microsoft.com/identity/bicep-templates-for-microsoft-entra-id-resources-is-ga/>
 <https://learn.microsoft.com/en-us/graph/templates/overview-bicep-templates-for-graph>

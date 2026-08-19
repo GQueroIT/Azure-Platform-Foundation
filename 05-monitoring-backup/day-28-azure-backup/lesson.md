@@ -68,6 +68,73 @@ resource protectedVm 'Microsoft.RecoveryServices/vaults/backupFabrics/protection
   production policies often keep weekly/monthly/yearly points layered on
   top of this.
 
+## Service Deep Dive
+
+### What It Can't Do
+A Recovery Services vault can't be deleted while it still contains
+protected items, registered containers, or - critically - anything in a
+soft-deleted state, and it can't skip that soft-delete waiting period
+even on demand. Soft-deleted backup items are retained for 14 days
+before Azure permanently removes them, and in regions where "secure by
+default" is enforced, that soft-delete behavior can't even be disabled
+through the portal to speed things up. For a repo built around tearing
+down resource groups on a regular cadence, this is a direct conflict:
+deleting the resource group containing this vault fails if the vault has
+anything in a soft-deleted state, and there's no force-delete override -
+waiting out the 14 days is the only guaranteed path if soft delete can't
+be disabled first.
+
+The vault also can't be removed by deleting its resource group in one
+clean sweep the way most other resources in this repo can - the resource
+group deletion fails with the same underlying vault error, so the vault
+needs cleaning up (backup items stopped/deleted, soft delete disabled if
+the region allows it) before the resource group deletion will succeed.
+
+### Nuances Worth Knowing
+- Stopping backup on a protected item is a choice between two
+  meaningfully different options: "stop protection and retain data"
+  (keeps existing recovery points, no new backups run) versus "stop
+  protection and delete data" (existing recovery points go into the
+  soft-deleted state, starting the 14-day clock). Picking the wrong one
+  for a lab teardown is exactly what leaves items sitting in soft-delete
+  purgatory blocking vault deletion later.
+- If soft delete genuinely can't be disabled (secure-by-default
+  regions), the only way to finish deleting a vault sooner than 14 days
+  is: undelete the soft-deleted items first, then delete them again
+  immediately - which, counterintuitively, is what actually triggers a
+  real permanent delete rather than waiting for the timer.
+- A vault itself can be soft-deleted too, not just the items inside it -
+  deleting a vault (once its contents are clean) can land it in its own
+  soft-deleted, recoverable state first, viewable and restorable from a
+  separate "Manage Deleted Vaults" view before its own permanent purge.
+
+### Troubleshooting You'll Actually Hit
+- **Error:** deleting the resource group fails, and drilling in shows
+  "Vault cannot be deleted as there are existing resources within the
+  vault" -> **Cause:** the vault still has registered backup items,
+  containers, or soft-deleted data -> **Fix:** stop protection (choosing
+  delete data, not retain, for a clean teardown) on every backup item
+  first, then delete the vault separately before retrying the resource
+  group delete.
+- **Error:** vault deletion fails with "there are backup items in soft
+  deleted state" even after all visible items are gone -> **Cause:**
+  items already deleted are sitting in the mandatory 14-day soft-delete
+  retention window -> **Fix:** if the region allows disabling soft
+  delete, do that, then undelete and immediately re-delete the
+  soft-deleted items to force a real permanent delete; if soft delete
+  can't be disabled for that vault/region, there's genuinely no faster
+  path than waiting.
+- **Symptom:** soft delete won't disable, citing the vault being set to
+  "Always On" -> **Cause:** secure-by-default enforcement in that
+  region/vault configuration locks soft delete on permanently ->
+  **Fix:** accept the 14-day wait for that vault; worth knowing before
+  building a habit of nightly resource group deletion around it.
+
+*Checked against: Microsoft Learn's "Delete a Microsoft Azure Recovery
+Services Vault," "Configure and manage soft delete for Azure Backup,"
+and "FAQ - soft delete in Azure Backup" docs.*
+
+
 ## Source
 <https://learn.microsoft.com/en-us/azure/templates/microsoft.recoveryservices/vaults/backuppolicies>
 <https://learn.microsoft.com/en-us/azure/site-recovery/quickstart-create-vault-bicep>

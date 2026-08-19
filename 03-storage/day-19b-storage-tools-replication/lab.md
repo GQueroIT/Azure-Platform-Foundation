@@ -1,0 +1,31 @@
+# Day 19b - Storage Explorer, AzCopy, Object Replication, and Blob Versioning
+
+## 1. Objective
+
+### Lab Objective (Portal)
+Use Storage Explorer to browse a storage account and AzCopy to copy blobs between containers, then configure blob versioning and an object replication policy between two accounts through the Portal. Maps to the Storage domain.
+
+### Bicep Objective
+Write Bicep enabling blob versioning and change feed on a source account, and an object replication policy pointing at a destination account.
+
+## 2. Steps Taken (Portal)
+What you clicked through in the Azure portal, in order.
+
+## 3. Bicep Translation
+The Bicep code you wrote to reproduce the same build. Paste the final
+version here or link to the file in ../bicep/.
+
+## 4. Verification
+How you confirmed it actually deployed correctly (portal check, az cli
+query, test connection, etc).
+
+## 5. Issues & Fixes
+Anything that broke, the error message, and what fixed it. This section
+is worth more than it looks - it's what you'll actually remember.
+
+## 6. Key Takeaways
+2-3 sentences on what this lab taught you and how it connects to the
+exam objective.
+
+## Cost Note
+What ran, for how long, and whether it's been deallocated/deleted.

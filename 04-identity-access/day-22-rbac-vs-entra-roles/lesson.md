@@ -50,6 +50,67 @@ Go back to your Day 01 `roleAssignments` Bicep and put it side by side
 with this lesson's `directoryRoleAssignments`. Same shape at a glance,
 completely different systems underneath.
 
+## Service Deep Dive
+
+### What It Can't Do
+Being Global Administrator in Entra ID grants nothing at all in Azure by
+default - not Reader, not Contributor, nothing. The two systems are
+deliberately, completely separate authorization models: Entra role
+assignments don't grant Azure resource access, and Azure RBAC
+assignments don't grant Entra ID access. A brand-new Global Admin
+signing into the Azure portal for the first time can see zero
+subscriptions, not because anything is broken, but because that's simply
+how the systems are designed to work.
+
+Entra roles also can't scope the same granular way Azure RBAC can. Azure
+RBAC scopes to a management group, subscription, resource group, or
+individual resource; most Entra roles are tenant-wide by default
+(Administrative Units narrow some Entra roles to a subset of users or
+groups, but it's a fundamentally coarser scoping model than Azure RBAC's).
+
+### Nuances Worth Knowing
+- There's exactly one documented bridge between the two systems: a
+  Global Administrator can flip "Access management for Azure resources"
+  to Yes under Microsoft Entra ID > Properties, which grants User Access
+  Administrator in Azure RBAC at the tenant root scope (`/`) - not
+  permanently, and not automatically. It's a one-time elevation a Global
+  Admin has to explicitly trigger, and Microsoft's own guidance is to
+  remove that elevated role assignment once the task is done rather than
+  leaving it in place.
+- That elevation setting is per-user, not global - triggering it
+  elevates the specific signed-in Global Administrator's own access; it
+  doesn't elevate every Global Administrator in the tenant at once.
+- The resulting User Access Administrator role at root scope is enough
+  to *assign* access to any subscription or management group, but it
+  isn't the same as being Owner or Contributor everywhere - it's
+  specifically an access-management role.
+
+### Troubleshooting You'll Actually Hit
+- **Symptom:** a Global Administrator signs into the Azure portal and
+  sees no subscriptions, or can't see/manage one someone else created ->
+  **Cause:** exactly the expected behavior when the two authorization
+  systems have never been bridged - Global Admin status alone was never
+  going to grant Azure access -> **Fix:** use the "Access management for
+  Azure resources" toggle in Entra ID Properties to self-elevate to User
+  Access Administrator at root scope, make the needed change, then
+  remove the elevated assignment again afterward.
+- **Symptom:** switching directories/tenants in the portal seems to fix
+  a similar-looking access problem for someone else -> **Cause:** a
+  different, more common cause of "I can't see my subscription" is
+  simply being signed into the wrong Entra tenant, which looks identical
+  to a genuine RBAC gap at first glance -> **Fix:** confirm the correct
+  directory is selected before assuming it's an RBAC/Entra-role mismatch
+  at all.
+- **Symptom:** an automation app or service account needs visibility
+  across every subscription in the tenant -> **Cause:** this is one of
+  the intended real use cases for elevated access, not a workaround ->
+  **Fix:** use the same elevation mechanism to grant that principal User
+  Access Administrator at root scope, deliberately and temporarily.
+
+*Checked against: Microsoft Learn's "Elevate access to manage all Azure
+subscriptions and management groups" doc.*
+
+
 ## Source
 <https://learn.microsoft.com/en-us/graph/templates/overview-bicep-templates-for-graph>
 
