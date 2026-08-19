@@ -548,6 +548,1086 @@ for outbound connections," "Troubleshoot Azure Load Balancer outbound
 connectivity issues," and "Troubleshoot backend health issues in Azure
 Application Gateway" docs.*''',
 
+    "day-07-app-service": '''### What It Can't Do
+F1/D1 aren't just "no custom domain" tiers - they carry hard daily quotas
+that stop the app outright. Free tier gets 60 CPU minutes per day (reset
+at midnight UTC), plus a rolling 5-minute CPU quota, plus bandwidth,
+memory, and filesystem caps. Cross any of them and the app returns a 403
+"Quota Exceeded" page for the rest of that window - a full stop, not a
+slowdown. Background processes (WebJobs, health-check pings, even
+platform diagnostics) burn this quota even when nobody is visiting the
+site, which is exactly why a lab app with near-zero real traffic can
+still hit it.
+
+Free tier also has no Always On - idle apps unload after roughly 20
+minutes, so the next request pays a cold start. Always On itself doesn't
+exist below Basic tier. And SNAT limits apply here too, unrelated to CPU
+quota: each App Service worker gets 128 preallocated SNAT ports for
+outbound connections to the same address+port combination, and that
+limit bites even on paid tiers under real load.
+
+### Nuances Worth Knowing
+- A deployment slot swap doesn't move everything, and which settings move
+  is easy to get backward. Settings marked "Deployment slot setting"
+  (sticky) stay with the slot and don't swap; unmarked settings swap with
+  the code. Forgetting to mark a staging-only connection string as sticky
+  is a real, common way for the wrong database to end up live in
+  production after a swap.
+- Not every setting respects stickiness even when marked - a documented
+  case found `healthCheckPath` swapping despite being expected to stay
+  put, so "sticky" isn't airtight for every property. "Swap with Preview"
+  shows exactly what will move before it happens, rather than trusting
+  the marking blindly.
+- Custom domains, TLS/SSL bindings, scale settings, and Always On itself
+  are always slot-specific and never swap, regardless of any setting -
+  no marking required or possible.
+
+### Troubleshooting You'll Actually Hit
+- **Error:** "Quota Exceeded," app returns 403 and won't load even though
+  traffic looks light -> **Cause:** F1/D1's daily or 5-minute CPU quota
+  was hit, often from background processes rather than real visits ->
+  **Fix:** check the App Service Plan > Quotas blade for which quota
+  tripped and its reset countdown; for a lab, wait it out - for anything
+  real, move off Free/Shared tier.
+- **Symptom:** after a slot swap, production is suddenly pointed at the
+  wrong database or config -> **Cause:** a setting that should have been
+  marked sticky wasn't, so it swapped along with the code -> **Fix:**
+  use "Swap with Preview" before swapping for real, and mark
+  environment-specific settings (connection strings, per-slot secrets)
+  as sticky consistently in both slots.
+- **Symptom:** intermittent failed or slow outbound calls to the same
+  external API or database under load -> **Cause:** SNAT port
+  exhaustion, same root cause as Day 13's Load Balancer -> **Fix:**
+  reuse/dispose HttpClient and connection objects instead of opening new
+  ones per call, or route the destination through a service/private
+  endpoint, which sidesteps the SNAT limit entirely.
+
+*Checked against: Microsoft Learn's "Azure App Service quotas and
+metrics," "Troubleshoot intermittent outbound connection errors," and
+"Set up staging environments" docs.*''',
+
+    "day-08-container-apps": '''### What It Can't Do
+Container Apps doesn't support vertical scaling - there's no "give this
+replica more CPU under load," only horizontal scale-out to more
+replicas. Replica counts are also a target, not a guarantee - Container
+Apps aims for what the scale rule computes, not a contractual exact
+number at every instant. Dapr actors specifically can't scale to zero
+even if the rest of the app's scale rule would otherwise allow it,
+because actor state depends on the replica staying alive.
+
+The Consumption plan's `minReplicas: 0` means the first request after
+idle always pays a real cold start - pulling the image, provisioning,
+and starting the app. And the default resource allocation when nothing
+is specified (0.25 vCPU / 0.5 Gi) is genuinely too small for most
+real workloads; it doesn't fail loudly, it just throttles, which looks
+exactly like an app bug with no obvious log entry pointing at resource
+limits.
+
+### Nuances Worth Knowing
+- Editing a scale rule doesn't update the running revision in place - it
+  creates an entirely new revision. In multiple-revisions mode, the old
+  one keeps running under its old rules until traffic allocation is
+  managed manually.
+- CPU throttling from an undersized allocation produces no error at all -
+  the process just runs slower. That absence of any obvious signal is
+  exactly what makes it look like a code problem instead of a sizing one.
+- Java apps in particular are known for slow startup, which can trip the
+  default readiness probe (the probe times out before the app is
+  actually ready) and get a replica stuck restarting in a loop, even
+  though it would have started fine given a few more seconds.
+
+### Troubleshooting You'll Actually Hit
+- **Symptom:** log stream shows "This revision is scaled to zero" and
+  nothing appears to be running -> **Cause:** exactly what it says -
+  `minReplicas` is 0 and nothing has triggered scale-out yet ->
+  **Fix:** send a request to trigger scale-out, or temporarily deploy a
+  revision with `minReplicas: 1` while actively debugging so logs
+  actually populate.
+- **Symptom:** a revision cycles between Running and Degraded, with
+  cryptic exit codes or nothing useful in the logs -> **Cause:** almost
+  always one of three things: the process crashes on startup (bad
+  config/missing secret), the readiness/liveness probe fails because the
+  app takes too long to start, or the app is listening on the wrong port
+  -> **Fix:** check system logs first (not just application logs) for
+  the actual exit reason, then increase the probe's initial delay if
+  slow startup is the real cause.
+- **Symptom:** the app feels slow under load with no clear cause in the
+  code -> **Cause:** CPU throttling from the default 0.25 vCPU/0.5 Gi
+  allocation being too small -> **Fix:** measure actual CPU/memory usage
+  first, then explicitly set `resources` on the container to match
+  rather than guessing.
+
+*Checked against: Microsoft Learn's "Scaling in Azure Container Apps,"
+"Troubleshooting in Azure Container Apps," and "Troubleshoot start
+failures in Azure Container Apps" docs.*''',
+
+    "day-11-vnet-subnets-nsg": '''### What It Can't Do
+Azure reserves five IP addresses in every subnet, not one - the network
+address, three Azure reserves for its own use (default gateway and DNS
+mapping), and the broadcast address at the top. A /24 subnet's 256
+addresses isn't actually 256 usable ones, it's 251. This catches people
+sizing subnets right at the edge of what they think they need.
+
+NSGs also can't do stateful application-layer inspection - they filter
+on the classic five-tuple (source/destination IP, source/destination
+port, protocol), not on what's actually inside the packet. "Block
+malicious HTTP payloads" is Azure Firewall or a WAF's job, not an NSG's.
+
+A subnet or NIC can only have one NSG at a time - no stacking two
+directly on the same subnet - though a subnet's NSG and a NIC's NSG
+absolutely can both be in play for the same VM simultaneously, which is
+where "traffic has to pass both" comes from.
+
+### Nuances Worth Knowing
+- The default rules (AllowVNetInBound, AllowAzureLoadBalancerInBound,
+  DenyAllInBound, and their outbound equivalents) can never be deleted
+  or edited, only overridden with a higher-priority (lower number)
+  custom rule. In the portal they show grayed out, which sometimes gets
+  mistaken for "disabled" - they're still fully active, just read-only.
+- Rule evaluation order differs by traffic direction: inbound traffic
+  hits the subnet-level NSG first, then the NIC-level NSG; outbound hits
+  the NIC-level NSG first, then subnet-level. Getting this backward is a
+  common source of "I fixed the rule but it's still blocked" when the
+  block is actually happening at the other level.
+- NSG flow logs (the older diagnostic tool) are being retired in favor
+  of Virtual Network flow logs - if a tutorial or older reference
+  mentions the former, that's the path going away, not the one to build
+  against now.
+
+### Troubleshooting You'll Actually Hit
+- **Symptom:** a deployment fails validation with something like "the
+  specified address prefix is fully utilized" for a subnet that "should"
+  have room -> **Cause:** forgetting Azure reserves 5 addresses per
+  subnet -> **Fix:** size subnets with that reservation in mind - a /28
+  for a handful of VMs, not a raw headcount match.
+- **Symptom:** traffic is blocked and a specific rule that should allow
+  it looks completely correct -> **Cause:** the block is coming from the
+  *other* NSG in the chain (subnet-level vs NIC-level) -> **Fix:** check
+  both NSGs attached to the resource's traffic path, and remember the
+  evaluation order differs for inbound vs outbound.
+- **Error:** `InUseNetworkSecurityGroupCannotBeDeleted` /
+  `InUseSubnetCannotBeDeleted` when tearing down a resource group ->
+  **Cause:** the NSG or subnet still has something attached to it (a
+  NIC, a peering, a private endpoint) -> **Fix:** the error message
+  lists exactly what's still attached - detach or delete that first.
+
+*Checked against: Microsoft Learn's "Network security groups overview"
+and Azure networking documentation on subnet address reservation.*''',
+
+    "day-12-peering-and-dns": '''### What It Can't Do
+Peering can't route through a gateway automatically. If VNet A has a VPN
+Gateway or ExpressRoute connection that VNet B needs to use, that
+requires explicitly enabling gateway transit on A's side
+(`allowGatewayTransit`) and remote gateways on B's side
+(`useRemoteGateways`) - leave either off and the peering update itself
+fails, not just silently declines to route.
+
+A private DNS zone by itself resolves nothing across a peering, even
+with correct records - Azure's default DNS resolver (168.63.129.16)
+only resolves names for VMs in the same VNet or a directly linked
+private DNS zone; being peered doesn't automatically extend that.
+
+Address spaces can't overlap between peered VNets - if both happen to
+use the same range (common when two teams each grab 10.0.0.0/16
+independently), peering can't be established until one is readdressed.
+
+### Nuances Worth Knowing
+- Peering requires links from both sides. If only one side is created,
+  the peering state shows "Initiated," not "Connected" - traffic doesn't
+  flow in that state, and it's easy to miss since the portal doesn't
+  loudly flag it as broken.
+- A peering stuck "Disconnected" can't just be edited back to health -
+  the fix is deleting the peering from both sides and recreating both
+  links from scratch.
+- Route propagation after creating or changing a peering isn't instant -
+  it can take a few minutes, so "resources can't reach each other yet"
+  right after standing up a peering is often just propagation delay.
+- A VM peered and DNS-linked correctly for the same-VNet case can still
+  fail cross-VNet name resolution intermittently - a documented
+  real-world pattern that often traces back to client-side DNS caching
+  or which specific DNS server the VM's NIC is actually using, not the
+  peering or zone configuration itself.
+
+### Troubleshooting You'll Actually Hit
+- **Symptom:** two VNets are peered but resources can't reach each other
+  at all -> **Cause:** peering status shows "Initiated" instead of
+  "Connected" - only one side created its half -> **Fix:** create the
+  missing peering resource on the other VNet.
+- **Symptom:** a VM can ping another VM's private IP across the peering
+  but not by hostname -> **Cause:** DNS resolution isn't automatic
+  across a peering -> **Fix:** link a Private DNS Zone to both VNets (or
+  configure custom DNS servers both point to), and confirm actual
+  records exist for the names being resolved.
+- **Error:** enabling `useRemoteGateways` fails or is rejected ->
+  **Cause:** the corresponding `allowGatewayTransit` wasn't set on the
+  VNet that actually owns the gateway -> **Fix:** set gateway transit on
+  the gateway-owning VNet's peering first, then remote gateways on the
+  other side.
+
+*Checked against: Microsoft Learn's "Troubleshoot virtual network
+peering issues" and "Troubleshoot virtual network peering route
+propagation and sync problems" docs.*''',
+
+    "day-14-bastion-vpn-gateway": '''### What It Can't Do
+Basic SKU Bastion (this lesson's build) can't do file upload/download
+through the portal at all - that's only available through a native
+RDP/SSH client, and only from Standard SKU up. Basic also can't use
+custom ports, IP-based connections, or host scaling - it's fixed at two
+instances with no way to add more.
+
+The GatewaySubnet has hard, non-negotiable requirements: named exactly
+`GatewaySubnet`, sized at least /27, and no NSG, route table, or other
+resource attached to it - genuinely can't, not just shouldn't. Azure
+refuses or fails the deployment if any of these are violated.
+AzureBastionSubnet has its own separate, equally strict requirement:
+exactly that name, minimum /26 (not /27 - that changed in November 2021,
+so older /27 deployments only still work because they predate the
+change), and no other resources or route tables in it either.
+
+Basic SKU VPN Gateway is treated as legacy - current guidance is
+VpnGw1 and above, and mixing SKUs (a Basic gateway with a Standard-SKU
+public IP) is a real, documented cause of deployment failure, not a
+style preference.
+
+### Nuances Worth Knowing
+- A brand-new VPN Gateway deployment isn't fast - creating the gateway
+  resource itself commonly takes 30-45 minutes even when everything is
+  configured correctly, easy to mistake for a stuck deployment given how
+  quickly most other resources in this repo deploy.
+- Site-to-Site connections are policy-based or route-based, and
+  mismatched Security Association settings or "one tunnel per subnet
+  pair" expectations between Azure and an on-prem device are a
+  documented cause of *intermittent* (not permanent) disconnects - it
+  looks unstable rather than broken, which sends people looking in the
+  wrong place first.
+- A user-defined route accidentally placed on the GatewaySubnet is a
+  documented, sneaky cause of "the tunnel shows Connected but traffic
+  still doesn't flow correctly for some destinations" - it's allowed to
+  exist there in ways that don't block deployment but do quietly break
+  specific traffic paths.
+
+### Troubleshooting You'll Actually Hit
+- **Error:** Bastion deployment fails validation -> **Cause:** almost
+  always the subnet name isn't exactly `AzureBastionSubnet`, or it's
+  smaller than /26 -> **Fix:** rename/resize the subnet to match exactly
+  - no flexibility here, unlike most subnet naming elsewhere in this
+  repo.
+- **Error:** VPN Gateway deployment fails or times out -> **Cause:**
+  most commonly the GatewaySubnet is undersized (below /27), misnamed,
+  or has an NSG/route table attached; a Basic-SKU gateway paired with a
+  non-Basic public IP is another frequent cause -> **Fix:** confirm
+  GatewaySubnet is named exactly that, sized /27+, has nothing else
+  attached, and that gateway/IP SKUs match.
+- **Symptom:** a Site-to-Site connection shows Connected but specific
+  traffic still doesn't reach its destination -> **Cause:** frequently a
+  UDR on the GatewaySubnet quietly overriding the expected path ->
+  **Fix:** check for and remove any route table on the GatewaySubnet
+  before assuming the VPN configuration itself is wrong.
+
+*Checked against: Microsoft Learn's "Azure Bastion FAQ," "About Azure
+Bastion configuration settings," and "Troubleshoot an Azure S2S VPN
+connection" docs.*''',
+
+    "day-15-network-watcher-review": '''### What It Can't Do
+Network Watcher's tools mostly diagnose the control plane and
+packet-level behavior - they don't reach inside application content. IP
+Flow Verify tells you whether a specific packet would be allowed or
+denied by NSG rules at a VM, but not whether the application behind that
+port is actually working; a green "Allowed" result and a broken app
+aren't mutually exclusive.
+
+NSG flow logs specifically can't be newly created anymore (creation
+stopped mid-2025), and the feature retires entirely on September 30,
+2027, at which point Azure deletes the flow log resources themselves
+(already-written log data in storage stays, following its own retention
+policy). Anything built against NSG flow logs going forward is building
+on a feature already past its practical shelf life - Virtual Network
+flow logs are the current path.
+
+Connection Troubleshoot and VPN Troubleshoot are one-time checks, not
+continuous monitoring - they answer "is this working right now," not
+"alert me if this breaks later." Continuous monitoring is Connection
+Monitor's job, a separate capability.
+
+### Nuances Worth Knowing
+- Network Watcher is usually auto-enabled per region the first time a
+  VNet is created there, and it lives in a special auto-created resource
+  group (`NetworkWatcherRG`) separate from your own - exactly why this
+  lesson's `existing` reference uses
+  `scope: resourceGroup('NetworkWatcherRG')` instead of the resource
+  group everything else in this repo deploys into.
+- IP Flow Verify and NSG Diagnostics sound similar but check different
+  scopes: IP Flow Verify answers the question at a single VM; NSG
+  Diagnostics can answer it across a VM, a VM Scale Set, or an
+  Application Gateway, and shows every NSG rule from every NSG in the
+  traffic's path, not just the first one it hits.
+- Packet capture requires an actual agent running on the target VM -
+  it's not a pure control-plane operation like most of Network Watcher's
+  other tools, so a VM without connectivity for the agent to phone home
+  can't be packet-captured even though every other diagnostic still
+  works against it.
+
+### Troubleshooting You'll Actually Hit
+- **Symptom:** two connected resources can't reach each other and
+  neither NSG inspection nor peering status shows anything obviously
+  wrong -> **Cause:** exactly the ambiguous case Connection Troubleshoot
+  exists for -> **Fix:** run Connection Troubleshoot between the two
+  specific endpoints; it tests actual connectivity rather than just
+  checking configuration, and reports the specific hop or rule where it
+  fails.
+- **Symptom:** a Site-to-Site VPN connection is unhealthy and it's
+  unclear why -> **Cause:** commonly a mismatched shared key between the
+  two gateways, something config inspection alone doesn't always surface
+  clearly -> **Fix:** run VPN Troubleshoot against the gateway; it's
+  built specifically to catch this class of mismatch.
+- **Symptom:** an older tutorial walks through setting up NSG flow logs
+  -> **Cause:** the tutorial predates the retirement announcement ->
+  **Fix:** build against Virtual Network flow logs instead - new NSG
+  flow log creation has already stopped.
+
+*Checked against: Microsoft Learn's "Network Watcher overview," "NSG
+flow logs overview," and "Network Watcher Frequently Asked Questions"
+docs.*''',
+
+    "day-16-storage-accounts-redundancy": '''### What It Can't Do
+Not every redundancy conversion is a one-step toggle, despite the portal
+presenting them all as a dropdown. Direct GZRS -> LRS, GRS -> ZRS, and
+ZRS -> GRS conversions aren't supported at all - each requires a staged,
+two-step conversion through an intermediate SKU, with a mandatory
+72-hour wait enforced between the two steps to let background
+replication catch up. A storage account with boot diagnostics enabled
+for a VM can't convert to ZRS or GZRS at all until boot diagnostics is
+disabled first - and once disabled to allow the conversion, it can't be
+re-enabled afterward without further changes. An account holding blobs
+in the Archive tier can't move to a zone-redundant option either -
+Archive isn't supported there, so those blobs have to be rehydrated to
+Hot or Cool first, which is itself slow and can be genuinely costly.
+
+### Nuances Worth Knowing
+- Redundancy conversions don't cause downtime or data loss for most
+  account types - access continues normally during the switch. The one
+  documented exception: accounts with a hierarchical namespace enabled
+  (Data Lake Storage Gen2) can see a brief pause, under 30 seconds,
+  while the account switches over.
+- Enabling geo-redundancy (moving to GRS/GZRS) triggers a one-time
+  egress charge to replicate existing data to the secondary region - a
+  real, billed event, not a free background sync.
+- Failing a GRS account over to its secondary region during a real
+  outage doesn't preserve geo-redundancy afterward - the account becomes
+  LRS in the new primary region, and it specifically can't convert
+  straight back to ZRS or GZRS from that state; getting zone-redundancy
+  back requires a manual migration, not just flipping the setting again.
+- Storage account names are globally unique across all of Azure, not
+  just your subscription - lowercase letters and numbers only, 3-24
+  characters. That's exactly why this lesson's Bicep uses
+  `uniqueString(resourceGroup().id)` rather than a fixed name - a fixed
+  name has a real chance of colliding with someone else's account
+  somewhere in the world.
+
+### Troubleshooting You'll Actually Hit
+- **Error:** converting an account's redundancy fails outright with an
+  unsupported-conversion error -> **Cause:** the specific direction
+  attempted (GZRS->LRS, GRS->ZRS, or ZRS->GRS) isn't a supported direct
+  conversion -> **Fix:** check Microsoft's redundancy conversion matrix
+  for the actual supported path - almost always a two-step conversion
+  with a mandatory 72-hour wait between steps.
+- **Error:** `StorageAccountTypeNotSupported` when starting a VM, or a
+  redundancy conversion silently fails -> **Cause:** boot diagnostics is
+  enabled on a VM using this storage account, which blocks
+  zone-redundant conversions entirely -> **Fix:** disable boot
+  diagnostics on the account first if the conversion needs to go through.
+- **Error:** deployment fails with a storage account name conflict even
+  though it looks unique -> **Cause:** storage account names are
+  globally unique across every Azure customer, not just your own
+  subscription -> **Fix:** use `uniqueString()` or another
+  guaranteed-unique naming pattern instead of a fixed, guessable name.
+
+*Checked against: Microsoft Learn's "Change how a storage account is
+replicated" and "Storage redundancy change FAQs" docs.*''',
+
+    "day-17-blob-lifecycle": '''### What It Can't Do
+A lifecycle management policy can't rehydrate a blob back to an online
+tier - it only ever moves things toward colder/cheaper tiers or deletes
+them; getting a blob out of Archive requires a separate, manual
+rehydration operation. It also can't run retroactively against its own
+creation - it applies going forward from its first evaluation, so blobs
+that already qualify at the moment the policy is created don't get swept
+up instantly; they wait for the first evaluation cycle like everything
+else.
+
+The delete action specifically won't touch a blob in an immutable
+container, or a blob currently in a soft-deleted state - the policy
+engine respects both protections rather than overriding them. And a
+policy can't be partially updated - the whole JSON policy is one
+document, so a small edit means resubmitting the entire policy, not
+patching one rule in place.
+
+### Nuances Worth Knowing
+- Nothing here runs on demand or continuously - Azure evaluates
+  lifecycle policies roughly once per day, and after creating or editing
+  a policy, the first evaluation can take up to 24 hours to even start.
+  "I set the rule five minutes ago and nothing moved" isn't broken, it's
+  just before the first scheduled run.
+- The clock a rule uses depends on what it's evaluating: current blob
+  versions use last-modified time (or last-access time, if access
+  tracking is explicitly enabled - it's off by default), previous
+  versions use their own creation time, and snapshots use the time the
+  snapshot itself was taken.
+- Moving a blob out of Cool into Archive before it's spent Cool's
+  minimum retention window (30 days) triggers an early-deletion charge -
+  a real, billed penalty for a rule that tiers too aggressively.
+- If a blob gets manually rehydrated back to Hot/Cool while a lifecycle
+  policy targeting it is still active, the same policy can tier it right
+  back to Archive on its next run - rehydrating doesn't exempt a blob
+  from the rule that archived it unless the rule or blob itself changes.
+
+### Troubleshooting You'll Actually Hit
+- **Symptom:** a rule was created or edited, and blobs that clearly meet
+  its conditions haven't moved or deleted after a day or more ->
+  **Cause:** either still within the up-to-24-hour window before the
+  first evaluation, or the modification/access timestamp hasn't actually
+  crossed the threshold yet -> **Fix:** confirm the actual timestamp on
+  the blob itself, and wait out the full evaluation window before
+  assuming the rule is broken.
+- **Symptom:** blobs that should be deleted remain in place indefinitely
+  -> **Cause:** commonly the blob is in an immutable container, or in a
+  soft-deleted state, both of which the delete action deliberately won't
+  touch -> **Fix:** check the container's immutability policy and the
+  blob's soft-delete status before assuming the rule is misconfigured.
+- **Symptom:** a rule using `daysAfterLastAccessTimeGreaterThan` never
+  triggers -> **Cause:** access time tracking wasn't explicitly enabled
+  on the account, so `LastAccessTime` isn't being recorded at all ->
+  **Fix:** enable last-access-time tracking first; a last-access rule
+  with tracking off will silently never fire.
+
+*Checked against: Microsoft Learn's "Azure Blob Storage lifecycle
+management overview" and "lifecycle management policy structure"
+docs.*''',
+
+    "day-18-azure-files": '''### What It Can't Do
+Azure Files' SMB protocol communicates over TCP port 445, and a large
+number of ISPs and corporate networks block that port outbound entirely,
+for historical reasons tied to old SMB 1.0 vulnerabilities - this isn't
+an Azure-side limitation, but it's a very real, very common blocker for
+on-prem or home-network clients trying to mount a share directly over
+the internet. There's no way to change which port SMB uses; the
+workarounds all avoid a direct SMB connection over the internet in the
+first place (private endpoint, VPN/ExpressRoute, or Azure File Sync as a
+local cache reachable over port 443).
+
+NFS shares specifically require the Premium tier and can't use the
+storage account's public endpoint at all - NFS Azure Files only works
+over a private endpoint or service endpoint inside a VNet, the opposite
+of SMB's default (publicly reachable unless explicitly restricted). A
+file share's quota is a ceiling, not a reservation on Standard tier -
+`shareQuota: 5` caps the share at 5 GB, but billing follows actual usage,
+not the quota; Premium tier is the opposite, provisioning and billing
+for the full quota upfront regardless of actual usage.
+
+### Nuances Worth Knowing
+- The standard diagnosis path for "can't mount, works from an Azure VM
+  but not from home" is almost always port 445, not credentials or share
+  config - the practical first test is a direct TCP connection check
+  (`Test-NetConnection -Port 445` or `nc -zv ... 445`) before touching
+  anything else.
+- Entra ID Kerberos authentication for SMB is a two-layer permission
+  model, not one - it needs both a share-level RBAC role assignment (in
+  Azure) and correct NTFS folder-level ACLs (set from within Windows).
+  Missing either layer blocks access even when the other is perfectly
+  configured, and the resulting error doesn't clearly say which layer is
+  the problem.
+- Standard file shares don't provision performance the way Premium
+  does - Premium performance scales directly with the quota set (bigger
+  provisioned quota = more IOPS/throughput), so undersizing quota on
+  Premium isn't just a capacity risk, it's a performance ceiling too.
+
+### Troubleshooting You'll Actually Hit
+- **Error:** "System error 53" or "System error 67" when mounting from
+  an on-prem machine -> **Cause:** port 445 is blocked somewhere between
+  the client and Azure - an ISP or corporate firewall, not an Azure-side
+  failure -> **Fix:** confirm with a direct port test first; if 445 is
+  genuinely blocked and can't be opened, route through a private
+  endpoint + VPN/ExpressRoute, or use Azure File Sync as a local
+  port-443 workaround instead of forcing a direct SMB mount.
+- **Symptom:** a user has the correct share-level RBAC role but still
+  can't access specific folders -> **Cause:** Entra Kerberos auth needs
+  matching NTFS ACLs set from Windows in addition to the RBAC role ->
+  **Fix:** verify both the Azure-side role assignment and the
+  Windows-side NTFS permissions on the specific folder, not just one or
+  the other.
+- **Symptom:** connecting works fine from an Azure VM in the same region
+  but fails from anywhere else -> **Cause:** consistent with a port-445
+  block specific to the client's network -> **Fix:** same as above -
+  this pattern (works from Azure, fails externally) is close to a
+  diagnostic signature for the port-445 case specifically.
+
+*Checked against: Microsoft Learn's "Troubleshoot Azure Files SMB
+connectivity and access issues" doc and Azure Files networking training
+material.*''',
+
+    "day-19-sas-private-endpoints": '''### What It Can't Do
+Creating a private endpoint doesn't automatically disable the storage
+account's public endpoint - those are two separate settings. Deploying a
+private endpoint and leaving public network access enabled leaves the
+resource reachable both ways at once, which defeats the isolation goal
+if the intent was "private only." A private endpoint also doesn't make
+DNS resolve correctly by itself - creating it creates a private IP, but
+nothing automatically points client DNS lookups at it; that requires a
+Private DNS Zone actually linked to the VNet the client sits in.
+
+A SAS token can't be selectively revoked once issued unless it was built
+around a stored access policy - a SAS generated directly against account
+keys is valid until it expires, full stop; the only way to kill it early
+is rotating the account keys themselves, which invalidates every other
+SAS issued from those same keys at the same time, not just the one meant
+to be revoked.
+
+### Nuances Worth Knowing
+- The single most common private endpoint failure isn't actually a
+  private-endpoint problem, it's DNS - and it typically shows up as a
+  403 "This TCP connection does not allow access" error from the
+  resource's firewall, because the client resolved the *public* hostname,
+  connected over the public endpoint, and got rejected by the exact
+  firewall rule the private endpoint was supposed to make irrelevant.
+- If a VNet uses custom DNS servers instead of Azure-provided DNS,
+  linking the Private DNS Zone to the VNet isn't enough by itself - the
+  custom DNS server also has to forward `privatelink.*` queries
+  specifically to Azure's DNS resolver (168.63.129.16), or it never even
+  asks Azure DNS about the private zone.
+- A private endpoint connection can sit in a Pending state even after
+  setup looks complete - this happens for cross-subscription or
+  cross-tenant connections, where the resource owner has to manually
+  approve the connection before any traffic flows.
+- User Delegation SAS tokens are capped at a maximum lifetime of 7 days
+  when re-authentication isn't required within that window - unlike
+  Account or Service SAS, which can be issued with much longer
+  expirations.
+
+### Troubleshooting You'll Actually Hit
+- **Error:** "403 - This TCP connection does not allow access to {host}"
+  on a resource with a private endpoint configured -> **Cause:** almost
+  always DNS resolving the public hostname to the public IP instead of
+  the private endpoint's IP, so the firewall rejects the connection as
+  if the private endpoint didn't exist -> **Fix:** `nslookup` the
+  hostname from a VM inside the VNet - if it returns a public IP, check
+  the Private DNS Zone is linked to that specific VNet, and if custom
+  DNS is in play, confirm it forwards `privatelink.*` queries to Azure
+  DNS.
+- **Symptom:** a private endpoint was created and everything else looks
+  correct, but traffic doesn't flow -> **Cause:** the connection is
+  sitting Pending, which happens by design for cross-subscription/
+  cross-tenant private endpoints until the resource owner approves it ->
+  **Fix:** check the connection's status on the target resource itself
+  and approve it if Pending.
+- **Symptom:** DNS resolves to the private IP on one attempt and the
+  public IP on the next, intermittently -> **Cause:** commonly multiple
+  DNS paths in play at once (a custom forwarder alongside Azure-provided
+  DNS, or stale caching from before the zone was linked) -> **Fix:**
+  flush the client's DNS cache, and confirm there's exactly one
+  consistent resolution path rather than a mix of custom and
+  Azure-provided DNS.
+
+*Checked against: Microsoft Learn's "Troubleshoot private endpoint DNS
+resolution failure" and "Troubleshoot 403 access denied errors ...
+through an approved private endpoint" docs.*''',
+
+    "day-21-entra-users-groups": '''### What It Can't Do
+The Graph extension's supported resource list is genuinely narrow, and
+even within Groups real gaps exist. A single Groups resource can't
+declare more than 20 members or owners - go over that and deployment
+fails outright with a 400 error, with nothing in the syntax warning
+about the wall in advance. Role-assignable groups (`isAssignableToRole:
+true`) look fully supported in the schema, but deploying one fails
+regardless of permissions - it's declared but not actually deployable
+through this extension yet; the documented workaround is a
+`DeploymentScript` resource calling Microsoft Graph directly instead.
+
+`what-if` doesn't work against Graph resources at all - none of the
+preview-before-deploy safety net this repo has relied on since Day 00
+applies here. Neither do deployment stacks or verbose deployment output.
+And deployed Graph resources genuinely don't show up on the Azure
+portal's deployment details page - only true ARM resources do, so
+confirming a Graph deployment succeeded means checking Entra ID
+directly, not the deployment history checked for everything else in
+this repo.
+
+### Nuances Worth Knowing
+- If a Graph resource created through Bicep gets deleted some other way
+  (portal, PowerShell, Graph API directly), redeploying the same Bicep
+  file doesn't recreate it cleanly - it throws a conflict error about
+  the unique name still technically existing in a deleted state. The fix
+  is one of three specific paths: permanently purge the deleted item,
+  restore it, or change the unique name in the Bicep file and redeploy
+  under a new identity.
+- App-only deployment (the kind used in most CI/CD pipelines) can't
+  declare a group with a `membershipRule` (dynamic membership) - that
+  combination fails with an explicit "AppOnly OBO tokens not supported"
+  error, because dynamic membership evaluation doesn't support the
+  automation flow app-only deployments use.
+- Application passwords (`passwordCredentials`) aren't supported on
+  `applications` or `servicePrincipals` resources - only `keyCredentials`
+  (certificates) are. A genuinely required password/secret is another
+  `DeploymentScript`-calls-Graph workaround, not a native Bicep property.
+
+### Troubleshooting You'll Actually Hit
+- **Error:** a Groups resource deployment fails with a 400 error and no
+  obviously wrong syntax -> **Cause:** likely more than 20 members
+  and/or owners declared on that single group -> **Fix:** split
+  membership assignment across multiple deployments/operations rather
+  than declaring everyone in one Groups resource block.
+- **Error:** redeploying a previously-working file fails with a
+  conflict about a group name that "already exists" even though it's
+  gone from the portal -> **Cause:** the group was deleted outside of
+  Bicep and Entra still holds it in a soft-deleted state under that
+  unique name -> **Fix:** purge or restore the deleted item through
+  Graph, or change the Bicep file's unique name and redeploy fresh.
+- **Symptom:** a deployment managing Graph resources "succeeds" per the
+  CLI, but nothing shows up in the Azure portal's deployment history ->
+  **Cause:** expected, not a failure - the portal's deployment details
+  page doesn't display Microsoft Graph resources at all -> **Fix:**
+  verify success directly in Entra ID or via Graph API/PowerShell.
+
+*Checked against: Microsoft Learn's "Known issues: Microsoft Graph Bicep
+Templates" and "Microsoft Graph Bicep Feature Limitations and
+Restrictions" docs.*''',
+
+    "day-22-rbac-vs-entra-roles": '''### What It Can't Do
+Being Global Administrator in Entra ID grants nothing at all in Azure by
+default - not Reader, not Contributor, nothing. The two systems are
+deliberately, completely separate authorization models: Entra role
+assignments don't grant Azure resource access, and Azure RBAC
+assignments don't grant Entra ID access. A brand-new Global Admin
+signing into the Azure portal for the first time can see zero
+subscriptions, not because anything is broken, but because that's simply
+how the systems are designed to work.
+
+Entra roles also can't scope the same granular way Azure RBAC can. Azure
+RBAC scopes to a management group, subscription, resource group, or
+individual resource; most Entra roles are tenant-wide by default
+(Administrative Units narrow some Entra roles to a subset of users or
+groups, but it's a fundamentally coarser scoping model than Azure RBAC's).
+
+### Nuances Worth Knowing
+- There's exactly one documented bridge between the two systems: a
+  Global Administrator can flip "Access management for Azure resources"
+  to Yes under Microsoft Entra ID > Properties, which grants User Access
+  Administrator in Azure RBAC at the tenant root scope (`/`) - not
+  permanently, and not automatically. It's a one-time elevation a Global
+  Admin has to explicitly trigger, and Microsoft's own guidance is to
+  remove that elevated role assignment once the task is done rather than
+  leaving it in place.
+- That elevation setting is per-user, not global - triggering it
+  elevates the specific signed-in Global Administrator's own access; it
+  doesn't elevate every Global Administrator in the tenant at once.
+- The resulting User Access Administrator role at root scope is enough
+  to *assign* access to any subscription or management group, but it
+  isn't the same as being Owner or Contributor everywhere - it's
+  specifically an access-management role.
+
+### Troubleshooting You'll Actually Hit
+- **Symptom:** a Global Administrator signs into the Azure portal and
+  sees no subscriptions, or can't see/manage one someone else created ->
+  **Cause:** exactly the expected behavior when the two authorization
+  systems have never been bridged - Global Admin status alone was never
+  going to grant Azure access -> **Fix:** use the "Access management for
+  Azure resources" toggle in Entra ID Properties to self-elevate to User
+  Access Administrator at root scope, make the needed change, then
+  remove the elevated assignment again afterward.
+- **Symptom:** switching directories/tenants in the portal seems to fix
+  a similar-looking access problem for someone else -> **Cause:** a
+  different, more common cause of "I can't see my subscription" is
+  simply being signed into the wrong Entra tenant, which looks identical
+  to a genuine RBAC gap at first glance -> **Fix:** confirm the correct
+  directory is selected before assuming it's an RBAC/Entra-role mismatch
+  at all.
+- **Symptom:** an automation app or service account needs visibility
+  across every subscription in the tenant -> **Cause:** this is one of
+  the intended real use cases for elevated access, not a workaround ->
+  **Fix:** use the same elevation mechanism to grant that principal User
+  Access Administrator at root scope, deliberately and temporarily.
+
+*Checked against: Microsoft Learn's "Elevate access to manage all Azure
+subscriptions and management groups" doc.*''',
+
+    "day-23-conditional-access-sspr": '''### What It Can't Do
+Conditional Access can't retroactively kill an already-issued sign-in
+token - policies are evaluated at sign-in time, so a session established
+before a new or tightened policy takes effect keeps running under the
+old rules until the token naturally expires or the user is forced to
+reauthenticate. It also can't protect against legacy authentication a
+third-party app still uses under the hood - if an app authenticates
+using a protocol Conditional Access doesn't evaluate, CA simply never
+gets a chance to apply. And Conditional Access for workload identities
+(service principals, managed identities) is a related-but-distinct
+capability from user-focused CA - a policy scoped to "All users" doesn't
+automatically cover a service principal's sign-ins unless workload
+identity CA is specifically configured for it.
+
+### Nuances Worth Knowing
+- Report-only mode is genuinely load-bearing, not a formality: it
+  evaluates every sign-in against the policy and logs exactly what
+  *would* have happened, without blocking or requiring anything. The
+  universally repeated guidance across real incident write-ups is that
+  every new policy starts in Report-only and gets checked against
+  sign-in logs before ever switching to On, no exceptions.
+- The single most common cause of a full tenant lockout isn't an
+  attacker - it's an admin publishing a policy scoped to "All users"
+  (instead of a pilot group) directly to On, with no break-glass account
+  excluded. When every admin loses access at once, there's no way to fix
+  it from inside the tenant - it becomes an out-of-band recovery
+  problem.
+- Break-glass accounts (at least two, cloud-only, excluded from every CA
+  policy) exist specifically as the last resort for that failure mode.
+  Best practice explicitly recommends two, not one - a single account is
+  itself a single point of failure if its password expires or its
+  credential is lost.
+- A Conditional Access policy that blocks legacy authentication or
+  requires a compliant device can end up blocking the very sign-in flow
+  a user needs to reach the SSPR password reset page, if the reset
+  portal itself isn't explicitly accounted for in policy scope.
+
+### Troubleshooting You'll Actually Hit
+- **Symptom:** every administrator is suddenly unable to sign in
+  shortly after a Conditional Access change -> **Cause:** almost always
+  a policy scoped too broadly, pushed straight to On without a
+  break-glass exclusion, matching the classic full-tenant-lockout
+  pattern -> **Fix:** if a working break-glass account exists, sign in
+  with it and disable/fix the offending policy immediately; if none
+  works, this becomes a Microsoft Support recovery case, not something
+  fixable from inside the tenant.
+- **Symptom:** a new policy switched to On and specific users report
+  being blocked unexpectedly -> **Cause:** the policy wasn't validated
+  in Report-only first, so edge cases weren't caught before enforcement
+  -> **Fix:** revert to Report-only, review sign-in logs filtered to
+  that policy name for every would-be-blocked result, and resolve or
+  explicitly exclude each case before re-enabling.
+- **Symptom:** a user can't complete SSPR after a Conditional Access
+  rollout despite correct credentials -> **Cause:** the policy is
+  blocking the authentication step needed to reach the reset flow itself
+  -> **Fix:** confirm the SSPR path is accounted for in the policy's
+  scope or exclusions, not just the main sign-in flow.
+
+*Checked against: Microsoft Q&A and Microsoft Learn guidance on
+Conditional Access lockout recovery and Report-only rollout practices.*''',
+
+    "day-24-hybrid-identity": '''### What It Can't Do
+Entra Connect can't fix a duplicate-attribute conflict on its own - if
+two AD objects end up with the same UserPrincipalName or proxyAddress,
+export to Entra ID fails with an `AttributeValueMustBeUnique`-style
+error, and the sync engine doesn't guess which one is "right." The fix
+always happens on the source side, in on-premises Active Directory - not
+inside Entra Connect itself. It also can't sync changes faster than its
+own cycle - the default delta sync interval is 30 minutes, so a change
+made in on-prem AD doesn't appear in Entra ID instantly; it waits for
+the next scheduled cycle, or a manually triggered one.
+
+Pass-through authentication specifically can't work if none of the
+lightweight authentication agents are online - unlike password hash sync
+(which keeps a hash copy in the cloud and keeps validating sign-ins even
+if every on-prem agent goes down), PTA validates every sign-in against
+on-prem AD in real time through those agents. No agent reachable means
+no sign-in validation, tenant-wide, for every hybrid user relying on it.
+
+### Nuances Worth Knowing
+- The single most common category of sync failure by far is a
+  duplicate-attribute conflict, not a connectivity or credentials
+  problem - two users ending up with the same UserPrincipalName or proxy
+  address is the case worth checking first when an object silently stops
+  syncing.
+- Actually running down a duplicate-attribute error is procedural:
+  identify the conflicting objects and the specific duplicated attribute
+  (via the Synchronization Service Manager connector space or the Entra
+  Connect Health sync error report), decide which object keeps the
+  value, remove it from the other object in on-prem AD, then let the
+  next sync cycle pick up the fix.
+- Since 2016, Entra ID has "duplicate attribute resiliency" enabled by
+  default - this quarantines the specific duplicated value rather than
+  blocking the entire object from syncing, a meaningfully softer failure
+  mode, but it still doesn't resolve the underlying duplicate; it just
+  stops one bad attribute from taking down an otherwise-fine object.
+- A stale "Last Synchronization" timestamp in Entra Connect Health
+  (older than the expected 30-minute cycle) is itself a symptom worth
+  treating seriously - it usually means the sync service has stopped
+  running entirely, not just that one object is having trouble.
+
+### Troubleshooting You'll Actually Hit
+- **Error:** an object export fails with `AttributeValueMustBeUnique`
+  (commonly on UserPrincipalName or proxyAddresses) -> **Cause:** two
+  on-prem AD objects have the same value for an attribute Entra ID
+  requires to be unique -> **Fix:** identify both conflicting objects
+  via Entra Connect Health's sync error report or the Synchronization
+  Service Manager, correct the wrong one directly in on-prem AD, and let
+  the next sync cycle clear the error.
+- **Symptom:** a change made in on-prem AD hasn't shown up in Entra ID
+  after a few minutes -> **Cause:** normal behavior, not a failure - the
+  default delta sync cycle runs every 30 minutes -> **Fix:** wait for
+  the next scheduled cycle, or manually trigger a delta sync if the
+  change is time-sensitive.
+- **Symptom:** hybrid users relying on pass-through authentication
+  suddenly can't sign in at all, tenant-wide -> **Cause:** all PTA
+  agents are offline or unreachable, leaving no path to validate
+  sign-ins against on-prem AD -> **Fix:** check agent health/connectivity
+  first; this is exactly the class of outage password hash sync, kept as
+  a backup alongside PTA, is specifically recommended to guard against.
+
+*Checked against: Microsoft Learn's "Microsoft Entra Connect:
+Troubleshoot errors during synchronization" and "Microsoft Entra Connect
+Health - Diagnose duplicated attribute synchronization errors" docs.*''',
+
+    "day-26-log-analytics-diagnostics": '''### What It Can't Do
+Diagnostic settings can't filter within a category - it's the whole log
+category or none of it; finer filtering happens after ingestion via a
+transformation, not at the diagnostic setting itself. A single
+diagnostic setting also can't send to more than one destination of the
+same type - one workspace, one storage account, one Event Hub max per
+setting; fanning out to two workspaces means creating two separate
+diagnostic settings.
+
+Every resource is capped at five diagnostic settings total, regardless
+of destinations or categories - hit that cap and the fix is removing an
+unused setting, not requesting an increase. For regional destinations
+(Storage accounts and Event Hubs specifically), the destination has to
+be in the same region as the resource being monitored - a diagnostic
+setting can't route logs cross-region to a storage account sitting
+somewhere else.
+
+### Nuances Worth Knowing
+- Nothing here is instant. Data can take up to 90 minutes to start
+  flowing after a diagnostic setting is first configured, even though it
+  usually arrives within a few minutes in practice - an empty query five
+  minutes after setup is expected, not broken.
+- A Log Analytics workspace has a default ingestion rate limit around
+  6 GB/minute (uncompressed) - a real, hittable ceiling under a genuine
+  spike, separate from the daily cap setting.
+- If a resource goes quiet and starts exporting nothing but zero-value
+  metrics, Azure incrementally backs off how often it checks it, up to a
+  two-hour maximum interval after seven days of inactivity - a
+  legitimately idle resource can look like a broken diagnostic setting
+  purely because of this backoff behavior, snapping back to normal
+  latency the moment real data starts flowing again.
+- Sending overlapping log categories from two diagnostic settings on the
+  same resource into the same workspace produces duplicate records, not
+  merged ones - each setting should own a distinct set of categories, or
+  point somewhere else entirely.
+
+### Troubleshooting You'll Actually Hit
+- **Symptom:** a Log Analytics query comes back empty right after
+  setting up a diagnostic setting -> **Cause:** normal ingestion
+  latency, up to 90 minutes -> **Fix:** wait before assuming
+  misconfiguration; re-check after enough time has passed.
+- **Symptom:** data collection stops mid-day with no obvious cause ->
+  **Cause:** either the workspace's daily cap was reached, or the
+  ~6 GB/min ingestion rate limit was hit -> **Fix:** run
+  `Operation | where OperationCategory == 'Data Collection Status'`
+  for the daily cap, or check for an "Ingestion" operation citing a rate
+  threshold crossed, then raise the cap or wait for the reset.
+- **Symptom:** metrics selected in the diagnostic setting don't show up
+  as expected when queried -> **Cause:** metrics routed through a
+  diagnostic setting land in the `AzureDiagnostics` table, not a
+  dedicated metrics table, and not every metric is exportable this way
+  -> **Fix:** query `AzureDiagnostics` specifically, and pull anything
+  missing directly via the Metrics REST API instead of assuming the
+  diagnostic setting is broken.
+
+*Checked against: Microsoft Learn's "Diagnostic settings in Azure
+Monitor" and "Troubleshoot why data is no longer being collected in
+Azure Monitor" docs.*''',
+
+    "day-27-alerts-action-groups": '''### What It Can't Do
+Notification actions aren't treated equally under the hood - SMS, voice,
+and email are all rate limited per phone number/address, but webhooks,
+Functions, and Logic App actions aren't rate limited at all. SMS and
+voice are capped at one notification every 5 minutes per number; email
+is capped at 100 messages per hour per address. Cross a threshold and
+Azure doesn't queue the extras for later - they're dropped, with only a
+separate notification saying rate limiting kicked in. This is an actual
+AZ-104 exam topic: an alert firing every minute for an hour produces
+roughly 60 emails but only about 12 SMS messages, purely from these two
+different caps.
+
+Metric alerts are also stateful by default - once an alert fires on a
+specific metric time series, it won't fire again for that series until
+the condition clears (three consecutive evaluations without it being
+met) and re-triggers. Deliberate noise reduction, not a bug, but it
+means "the alert only notified me once even though the CPU stayed high
+for an hour" is expected behavior.
+
+### Nuances Worth Knowing
+- If genuinely continuous notifications are needed, that requires
+  explicitly making the alert rule stateless (`autoMitigate: false` in
+  Bicep/ARM, or unchecking "Automatically resolve alerts" in the
+  portal) - the default stateful behavior otherwise suppresses repeat
+  notifications on purpose.
+- Dynamic thresholds need real history before they mean anything -
+  Microsoft's own guidance is a minimum of 3 days and 30 metric samples
+  before a dynamic threshold becomes active. A dynamic-threshold alert
+  on a resource created minutes ago has nothing to learn from yet.
+- Action groups aren't capped per subscription (effectively unlimited),
+  but an alert rule's combined properties (query, dimensions,
+  description, referenced action groups) can't exceed 64 KB - a large
+  KQL query with many dimensions can hit this ceiling and fail at
+  creation with a vague "there was a problem with the server" error that
+  doesn't obviously point at size as the cause.
+- A fired alert visible in the portal but with no SMS/voice/push
+  actually delivered is very often an alert processing rule silently
+  suppressing that action (e.g. a maintenance-window suppression rule) -
+  worth checking before assuming the action group itself is broken.
+
+### Troubleshooting You'll Actually Hit
+- **Symptom:** an alert is clearly firing repeatedly in the portal, but
+  notifications stopped arriving partway through -> **Cause:** the
+  per-recipient rate limit was hit and the excess notifications were
+  simply dropped -> **Fix:** confirm this by checking for the rate-limit
+  notice sent to that address/number, then reduce alert noise at the
+  source or route high-volume notifications through a non-rate-limited
+  action type like a webhook instead.
+- **Symptom:** a condition stays true for a long stretch but only one
+  notification ever arrived -> **Cause:** the metric alert is stateful
+  by default and deliberately doesn't re-notify on the same ongoing
+  issue -> **Fix:** if repeat notifications are actually wanted,
+  explicitly set the rule to stateless (`autoMitigate: false`).
+- **Symptom:** creating an alert rule fails with a vague server error ->
+  **Cause:** the combined size of the rule's query, dimensions,
+  description, and action group references exceeded 64 KB -> **Fix:**
+  simplify the query or split an overly broad multi-dimension rule into
+  smaller, more targeted rules.
+
+*Checked against: Microsoft Learn's "Create and manage action groups in
+Azure Monitor," "Troubleshooting Azure Monitor alerts and
+notifications," and "Troubleshoot Azure Monitor metric alerts" docs.*''',
+
+    "day-28-azure-backup": '''### What It Can't Do
+A Recovery Services vault can't be deleted while it still contains
+protected items, registered containers, or - critically - anything in a
+soft-deleted state, and it can't skip that soft-delete waiting period
+even on demand. Soft-deleted backup items are retained for 14 days
+before Azure permanently removes them, and in regions where "secure by
+default" is enforced, that soft-delete behavior can't even be disabled
+through the portal to speed things up. For a repo built around tearing
+down resource groups on a regular cadence, this is a direct conflict:
+deleting the resource group containing this vault fails if the vault has
+anything in a soft-deleted state, and there's no force-delete override -
+waiting out the 14 days is the only guaranteed path if soft delete can't
+be disabled first.
+
+The vault also can't be removed by deleting its resource group in one
+clean sweep the way most other resources in this repo can - the resource
+group deletion fails with the same underlying vault error, so the vault
+needs cleaning up (backup items stopped/deleted, soft delete disabled if
+the region allows it) before the resource group deletion will succeed.
+
+### Nuances Worth Knowing
+- Stopping backup on a protected item is a choice between two
+  meaningfully different options: "stop protection and retain data"
+  (keeps existing recovery points, no new backups run) versus "stop
+  protection and delete data" (existing recovery points go into the
+  soft-deleted state, starting the 14-day clock). Picking the wrong one
+  for a lab teardown is exactly what leaves items sitting in soft-delete
+  purgatory blocking vault deletion later.
+- If soft delete genuinely can't be disabled (secure-by-default
+  regions), the only way to finish deleting a vault sooner than 14 days
+  is: undelete the soft-deleted items first, then delete them again
+  immediately - which, counterintuitively, is what actually triggers a
+  real permanent delete rather than waiting for the timer.
+- A vault itself can be soft-deleted too, not just the items inside it -
+  deleting a vault (once its contents are clean) can land it in its own
+  soft-deleted, recoverable state first, viewable and restorable from a
+  separate "Manage Deleted Vaults" view before its own permanent purge.
+
+### Troubleshooting You'll Actually Hit
+- **Error:** deleting the resource group fails, and drilling in shows
+  "Vault cannot be deleted as there are existing resources within the
+  vault" -> **Cause:** the vault still has registered backup items,
+  containers, or soft-deleted data -> **Fix:** stop protection (choosing
+  delete data, not retain, for a clean teardown) on every backup item
+  first, then delete the vault separately before retrying the resource
+  group delete.
+- **Error:** vault deletion fails with "there are backup items in soft
+  deleted state" even after all visible items are gone -> **Cause:**
+  items already deleted are sitting in the mandatory 14-day soft-delete
+  retention window -> **Fix:** if the region allows disabling soft
+  delete, do that, then undelete and immediately re-delete the
+  soft-deleted items to force a real permanent delete; if soft delete
+  can't be disabled for that vault/region, there's genuinely no faster
+  path than waiting.
+- **Symptom:** soft delete won't disable, citing the vault being set to
+  "Always On" -> **Cause:** secure-by-default enforcement in that
+  region/vault configuration locks soft delete on permanently ->
+  **Fix:** accept the 14-day wait for that vault; worth knowing before
+  building a habit of nightly resource group deletion around it.
+
+*Checked against: Microsoft Learn's "Delete a Microsoft Azure Recovery
+Services Vault," "Configure and manage soft delete for Azure Backup,"
+and "FAQ - soft delete in Azure Backup" docs.*''',
+
+    "day-29-update-management-arc": '''### What It Can't Do
+Arc onboarding requires genuine outbound HTTPS (port 443) connectivity
+to a specific set of Microsoft endpoints - not general internet access,
+specific URLs (agent service, guest configuration, resource management,
+and more). A machine with broad internet access but a corporate/ISP
+firewall blocking a subset of those specific hostnames still fails
+onboarding, and the failure often looks like a generic network error
+unless you specifically check for which endpoint is unreachable. Arc
+also can't provide identical feature parity with a genuinely native
+Azure VM - `Microsoft.HybridCompute/machines` gives Azure Policy, RBAC,
+tagging, and (once onboarded) Update Manager against the machine, but
+it's a different resource type sitting on top of real hardware, not a VM
+ARM fully manages the underlying compute for.
+
+### Nuances Worth Knowing
+- `azcmagent check` exists specifically to answer "can this machine
+  actually reach what it needs to reach" before or during onboarding -
+  it tests connectivity against every required endpoint individually and
+  reports exactly which succeeded or failed, and also reports whether
+  traffic is routing directly, through a private link, or through a
+  proxy. Running this first, rather than attempting `connect` and
+  parsing a generic failure, is the faster path to the actual root
+  cause.
+- `azcmagent` failures return a specific exit/error code (like
+  `AZCM0026` for a network error) that maps to a documented cause -
+  looking up the specific code is more useful than treating any failure
+  as the same generic "it didn't work."
+- A machine that connects successfully once can still later show as
+  "Disconnected" in the portal - this specifically means it lost its
+  ongoing connection after initially succeeding, and the fix path
+  (re-running `connect`, sometimes after force-disconnecting locally and
+  deleting the stale Azure-side resource) differs from a first-time
+  onboarding failure.
+- Verbose agent logs live locally on the machine itself
+  (`%ProgramData%\\AzureConnectedMachineAgent\\Log\\` on Windows,
+  `/var/opt/azcmagent/log/` on Linux, directly relevant to the RHEL box)
+  - checking these directly is often faster than working only from what
+  the CLI prints to the terminal.
+
+### Troubleshooting You'll Actually Hit
+- **Error:** `azcmagent connect` fails with exit code `AZCM0026`
+  (Network Error) listing specific unreachable endpoints -> **Cause:**
+  outbound HTTPS to one or more required Arc endpoints is blocked by a
+  firewall, proxy, or DNS issue - agent installation succeeded, but the
+  machine can't register with Azure's control plane -> **Fix:** run
+  `azcmagent check --location <your-region>` for the exact list of
+  reachable vs. unreachable endpoints, then fix whatever's actually
+  blocking those specific URLs rather than opening broad outbound
+  access.
+- **Symptom:** a previously-connected Arc machine shows as
+  "Disconnected" in the portal -> **Cause:** the agent lost its ongoing
+  connection after a successful initial registration - could be the same
+  connectivity causes as onboarding, or a stopped/crashed agent service
+  -> **Fix:** check the agent's live status and service health on the
+  machine itself first, and if reconnecting cleanly isn't possible,
+  force a local disconnect and delete the stale Azure-side resource
+  before re-registering fresh.
+- **Symptom:** connectivity looks fine over a general internet test, but
+  Arc onboarding still fails -> **Cause:** Arc doesn't need generic
+  internet access, it needs specific documented endpoints reachable - a
+  firewall can pass general traffic while still blocking the handful of
+  hostnames Arc actually needs -> **Fix:** don't trust a general
+  ping/browse test; use `azcmagent check` against the actual required
+  endpoint list instead.
+
+*Checked against: Microsoft Learn's "Troubleshoot Azure Connected
+Machine agent connection issues" doc and Azure Arc connectivity
+troubleshooting guidance.*''',
 }
 
 # 06-terraform-migration re-uses day-01/02/03 folder names for its own
